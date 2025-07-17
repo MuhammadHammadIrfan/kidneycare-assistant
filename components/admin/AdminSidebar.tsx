@@ -2,6 +2,9 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import { UserPlus, LayoutDashboard, LogOut } from "lucide-react";
+import { signOut } from "../../lib/auth";
+import Cookies from "js-cookie";
+
 
 const navLinks = [
   {
@@ -20,11 +23,9 @@ export default function AdminSidebar() {
   const router = useRouter();
 
   const handleSignOut = () => {
-    // Clear any local/session storage if used for user info
-    if (typeof window !== "undefined") {
-      localStorage.clear();
-      sessionStorage.clear();
-    }
+    Cookies.remove("kc_user");
+    localStorage.removeItem("kc_user");
+    sessionStorage.clear();
     router.push("/");
   };
 

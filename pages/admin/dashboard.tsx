@@ -1,6 +1,11 @@
 import React from "react";
 import { motion } from "framer-motion";
 import AdminSidebar from "../../components/admin/AdminSidebar";
+import { requireAuthServer } from '../../lib/requireAuthServer';
+
+export async function getServerSideProps(context: any) {
+  return requireAuthServer(context, ["admin"]);
+}
 
 export default function AdminDashboard() {
   // Placeholder stats, replace with real data from API later

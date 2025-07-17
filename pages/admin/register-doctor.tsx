@@ -3,6 +3,11 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import AdminSidebar from "../../components/admin/AdminSidebar";
 import { motion } from "framer-motion";
+import { requireAuthServer } from '../../lib/requireAuthServer';
+
+export async function getServerSideProps(context: any) {
+  return requireAuthServer(context, ["admin"]);
+}
 
 export default function RegisterDoctor() {
   const [name, setName] = useState("");

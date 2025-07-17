@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { motion } from "framer-motion";
 
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,6 +30,7 @@ export default function LoginPage() {
     if (!res.ok) {
       setError(data.error || "Login failed");
     } else {
+      Cookies.set("kc_user", JSON.stringify(data), { expires: 1 }); // 1 day expiry
       // Redirect based on user role
       if (data.role === "admin") {
         router.push("/admin/dashboard");
@@ -48,6 +50,15 @@ export default function LoginPage() {
         transition={{ duration: 0.7 }}
         className="bg-white/90 rounded-xl shadow-lg p-8 w-full max-w-md"
       >
+        <div className="text-left mb-2">
+            <button
+                onClick={() => router.push("/")}
+                className="text-sm text-rose-600 hover:-translate-y-0.5 transition-transform duration-200"
+            >
+                ← Back to Home
+            </button>
+        </div>
+
         <h2 className="text-2xl font-bold text-rose-700 mb-6 text-center">
           Login to KidneyCare Assistant
         </h2>
