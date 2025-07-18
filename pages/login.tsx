@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { motion } from "framer-motion";
-
+import Cookies from "js-cookie";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
