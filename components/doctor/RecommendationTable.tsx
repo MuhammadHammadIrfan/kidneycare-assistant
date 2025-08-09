@@ -13,9 +13,11 @@ type Question = {
 export default function RecommendationTable({
   situationId,
   labReportId,
+  onRecommendationsSaved,
 }: {
   situationId: number;
   labReportId: string;
+  onRecommendationsSaved?: (recommendations: any[]) => void;
 }) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, number>>({});
@@ -59,21 +61,49 @@ export default function RecommendationTable({
     setLoading(true);
     setError(null);
     setSuccess(null);
-    const res = await fetch("/api/doctor/assign-recommendation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        labReportId,
-        answers: Object.entries(answers).map(([questionId, selectedOptionId]) => ({
-          questionId: Number(questionId),
-          selectedOptionId,
-        })),
-      }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) setError(data.error || "Failed to save");
-    else setSuccess("Recommendations saved!");
+    
+    try {
+      // Convert answers to the format expected by the API
+      const recommendations = Object.entries(answers).map(([questionId, selectedOptionId]) => ({
+        questionId: Number(questionId),
+        selectedOptionId,
+      }));
+
+      console.log('Sending recommendations:', { labReportId, recommendations });
+
+      const res = await fetch("/api/doctor/assign-recommendation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          labReportId,
+          recommendations, // ← Changed from 'answers' to 'recommendations'
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to save recommendations");
+      }
+      
+      setSuccess("Recommendations saved!");
+      
+      // Prepare recommendations data for the report
+      const savedRecommendations = questions.map((q) => ({
+        questionText: q.questionText,
+        selectedOptionText: q.options.find(opt => opt.id === answers[q.questionId])?.text || "Not selected"
+      }));
+      
+      // Call the callback if provided
+      if (onRecommendationsSaved) {
+        onRecommendationsSaved(savedRecommendations);
+      }
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save recommendations");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!situationId) return null;
