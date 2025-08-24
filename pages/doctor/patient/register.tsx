@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, User, TestTube, FileText, CheckCircle } from "lucide-react";
+import { Menu, User, TestTube, FileText, CheckCircle, TrendingUp } from "lucide-react";
 import DoctorSidebar from "../../../components/doctor/DoctorSidebar";
 import PatientForm from "../../../components/doctor/PatientForm";
 import TestInputTable from "../../../components/doctor/TestInputTable";
@@ -353,6 +353,18 @@ export default function RegisterPatient({ user }: { user: any }) {
               labReportId={classificationResult.labReportId}
               onRecommendationsSaved={handleRecommendationsSaved}
             />
+
+            {/* Trend Analysis for New Patient */}
+            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
+              <h3 className="text-lg font-semibold text-blue-800 mb-4">Lab Test Trends</h3>
+              <p className="text-gray-600 mb-4">
+                This is the first visit for this patient. Trends will be available after future visits.
+              </p>
+              <div className="bg-gray-50 rounded-lg p-8 text-center">
+                <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-500">Trend analysis will be available after multiple visits</p>
+              </div>
+            </div>
 
             <div className="flex justify-center">
               <Button

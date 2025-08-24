@@ -70,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Fetch situationId from DB
   const { data: situationRow } = await supabaseAdmin
     .from("Situation")
-    .select("id")
+    .select("id, groupid, code")
     .eq("groupid", group)
     .eq("code", situation)
     .single();
@@ -99,37 +99,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const labReportId = labReportData[0].id;
 
   // 2. Insert new test results
-  const { data: testTypes } = await supabaseAdmin.from("TestType").select("id,code");
-  const codeToId: Record<string, number> = {};
-  testTypes?.forEach((tt: any) => { codeToId[tt.code] = tt.id; });
+  // Create test results for each test value
+  const testPromises = Object.entries(testValues).map(async ([testCode, value]) => {
+    if (value === "" || value === null || value === undefined) return null;
 
-  const testInserts = Object.entries(testValues)
-    .filter(([code, value]) => value !== "" && codeToId[code])
-    .map(([code, value]) => ({
-      patientid: patientId,
-      testtypeid: codeToId[code],
-      value: parseFloat(value as string),
-      testdate: new Date().toISOString(),
-      enteredbyid: doctorId,
-    }));
+    // Get test type ID
+    const { data: testType, error: testTypeError } = await supabaseAdmin
+      .from("TestType")
+      .select("id")
+      .eq("code", testCode)
+      .single();
 
-  console.log("Follow-up test inserts:", testInserts);
-
-  let testResultIds: string[] = [];
-  if (testInserts.length > 0) {
-    const { data: testResultData, error: testError } = await supabaseAdmin
-      .from("TestResult")
-      .insert(testInserts)
-      .select("id");
-
-    if (testError) {
-      console.error("Test results insertion error:", testError);
-      return res.status(500).json({ error: "Failed to save test results" });
+    if (testTypeError || !testType) {
+      console.error(`Test type not found for code: ${testCode}`, testTypeError);
+      return null;
     }
-    testResultIds = (testResultData || []).map((tr: any) => tr.id);
-  }
 
-  // 3. Link test results to lab report
+    // Insert test result with TODAY's date - Remove labreportid since it doesn't exist in your schema
+    const { data: testResult, error: testResultError } = await supabaseAdmin
+      .from("TestResult")
+      .insert({
+        patientid: patientId,
+        testtypeid: testType.id,
+        value: parseFloat(value.toString()),
+        testdate: new Date().toISOString().split('T')[0], // ✅ TODAY'S DATE
+        enteredbyid: doctorId, // Add the doctor who entered the test
+        // Remove labreportid - not in your schema
+      })
+      .select("id")
+      .single();
+
+    if (testResultError) {
+      console.error(`Failed to create test result for ${testCode}:`, testResultError);
+      return null;
+    }
+
+    console.log(`[FOLLOWUP API] Created test result for ${testCode}: ${testResult.id} with date ${new Date().toISOString().split('T')[0]}`);
+    return testResult.id;
+  });
+
+  const testResultIds = (await Promise.all(testPromises)).filter(Boolean);
+  console.log(`[FOLLOWUP API] Created ${testResultIds.length} test results with today's date`);
+
+  // 3. Link test results to lab report (keep this as is since LabReportTestLink table exists)
   if (testResultIds.length > 0) {
     const links = testResultIds.map(testResultId => ({
       labreportid: labReportId,
@@ -143,15 +155,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error("Lab report link error:", linkError);
       return res.status(500).json({ error: "Failed to link test results to report" });
     }
+    console.log(`[FOLLOWUP API] Linked ${testResultIds.length} test results to lab report ${labReportId}`);
   }
 
+  // Return response with proper timing
   return res.status(200).json({
     success: true,
-    patientId,
-    labReportId,
-    group,
-    bucket,
-    situation,
-    situationId,
+    labReportId: labReportId,
+    group: situationRow?.groupid || group,
+    bucket: bucket,
+    situation: situationRow?.code || situation,
+    situationId: situationRow?.id || null,
+    message: "Follow-up visit recorded successfully"
   });
 }

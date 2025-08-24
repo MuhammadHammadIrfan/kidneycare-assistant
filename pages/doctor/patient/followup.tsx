@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, User, TestTube, FileText, CheckCircle } from "lucide-react";
+import { Menu, User, TestTube, FileText, CheckCircle, AlertTriangle, Clock, Calendar, TrendingUp } from "lucide-react";
+import TrendGraph from "../../../components/doctor/TrendGraph";
 import DoctorSidebar from "../../../components/doctor/DoctorSidebar";
 import PatientSearch from "../../../components/doctor/PatientSearch";
 import TestInputTable from "../../../components/doctor/TestInputTable";
@@ -50,6 +51,7 @@ type TestResult = {
 export default function FollowUpVisits({user}: {user:any}) {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<"search" | "tests" | "recommendations" | "complete">("search");
+  const [showSearch, setShowSearch] = useState(true);
   
   // Patient data
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -81,14 +83,17 @@ export default function FollowUpVisits({user}: {user:any}) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [savedRecommendations, setSavedRecommendations] = useState<any[]>([]);
+  const [testValidityData, setTestValidityData] = useState<Record<string, any>>({});
+  const [validityLoading, setValidityLoading] = useState(false);
+  const [expiredTestsCount, setExpiredTestsCount] = useState(0);
 
-  const handlePatientFound = (patient: Patient, report: RecentReport | null, tests: TestResult[]) => {
+  const handlePatientFound = (patient: Patient) => {
     setSelectedPatient(patient);
-    setRecentReport(report);
-    setRecentTests(tests);
     setCurrentStep("tests");
-    setError(null);
-    setSuccess(null);
+    setShowSearch(false);
+    
+    // Fetch test validity data
+    fetchTestValidity(patient.id);
   };
 
   const handleTestChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -96,12 +101,26 @@ export default function FollowUpVisits({user}: {user:any}) {
     setTestValues((prev) => ({ ...prev, [name]: value }));
   };
 
+
+
+  // Update the handleSubmitTests function to ensure proper data flow:
+
   const handleSubmitTests = async () => {
     if (!selectedPatient) return;
     
-    // Validate required fields
-    const requiredFields = ["PTH", "Ca", "Albumin", "Phos", "Echo", "LARad"];
-    const missingFields = requiredFields.filter(field => !testValues[field as keyof typeof testValues]);
+    // Validate required fields - check for null/undefined/empty string, not falsy values
+    const requiredFields = [
+      { field: "PTH", value: testValues.PTH },
+      { field: "Ca", value: testValues.Ca },
+      { field: "Albumin", value: testValues.Albumin },
+      { field: "Phos", value: testValues.Phos },
+      { field: "Echo", value: testValues.Echo },
+      { field: "LARad", value: testValues.LARad }
+    ];
+    
+    const missingFields = requiredFields.filter(({ value }) => 
+      value === null || value === undefined || value === ""
+    ).map(({ field }) => field);
     
     if (missingFields.length > 0) {
       setError(`Please fill in all required fields: ${missingFields.join(", ")}`);
@@ -136,14 +155,54 @@ export default function FollowUpVisits({user}: {user:any}) {
         labReportId: data.labReportId,
       });
 
-      setCurrentStep("recommendations");
-      setSuccess("Test results submitted successfully!");
+      // Add a small delay to ensure database is updated before moving to next step
+      setTimeout(() => {
+        setCurrentStep("recommendations");
+        setSuccess("Test results submitted successfully!");
+      }, 500);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
   };
+
+  // Add state for forcing TrendGraph refresh
+  const [trendGraphKey, setTrendGraphKey] = useState(0);
+
+  // Update the recommendations section to force refresh TrendGraph:
+  {/* Enhanced Trend Analysis with Validity Information */}
+  {selectedPatient && (
+    <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-blue-800 flex items-center">
+          <TrendingUp className="w-5 h-5 mr-2" />
+          Lab Test Trends & History
+        </h3>
+        <div className="text-sm text-gray-600">
+          Follow-up Visit Analysis
+        </div>
+      </div>
+      
+      {/* Force re-render with key and add loading state */}
+      <TrendGraph 
+        key={`trend-${selectedPatient.id}-${trendGraphKey}-${classificationResult?.labReportId}`}
+        patientId={selectedPatient.id} 
+        patientName={selectedPatient.name}
+        showTitle={false}
+        height={400}
+      />
+      
+      <div className="mt-4 bg-blue-50 rounded-lg p-3">
+        <p className="text-sm font-medium text-gray-800">
+          <strong className="text-blue-900">💡 Analysis Note:</strong> This trend analysis shows how test values have changed over time, 
+          including carried-forward values when tests weren't repeated. Fresh tests are highlighted with larger, 
+          solid points, while carried-forward values are shown with reduced opacity.
+        </p>
+      </div>
+    </div>
+  )}
 
   const handleRecommendationsSaved = (recommendations: any[]) => {
     setSavedRecommendations(recommendations);
@@ -170,6 +229,56 @@ export default function FollowUpVisits({user}: {user:any}) {
     setError(null);
     setSuccess(null);
   };
+
+  const fetchTestValidity = async (patientId: string) => {
+    setValidityLoading(true);
+    try {
+      const response = await fetch(`/api/doctor/patient/test-validity?patientId=${patientId}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setTestValidityData(data.testValidityData);
+        setExpiredTestsCount(data.summary.expiredTests);
+        
+        // Pre-fill test values with last valid values
+        const newTestValues = { ...testValues };
+        Object.entries(data.testValidityData).forEach(([testCode, validity]: [string, any]) => {
+          if (validity.lastResult && validity.validityStatus.isValid) {
+            // Map test codes to form field names
+            const fieldMapping: Record<string, keyof typeof testValues> = {
+              'PTH': 'PTH',
+              'Ca': 'Ca',
+              'Albumin': 'Albumin', 
+              'CaCorrected': 'CaCorrected',
+              'Phos': 'Phos',
+              'Echo': 'Echo',
+              'LARad': 'LARad'
+            };
+            
+            const fieldName = fieldMapping[testCode];
+            if (fieldName) {
+              newTestValues[fieldName] = validity.lastResult.value;
+            }
+          }
+        });
+        
+        setTestValues(newTestValues);
+      } else {
+        setError(data.error || 'Failed to fetch test validity');
+      }
+    } catch (err) {
+      setError('Failed to fetch test validity information');
+    } finally {
+      setValidityLoading(false);
+    }
+  };
+
+  // Function to calculate corrected calcium
+  const calculateCorrectedCalcium = (calcium: number, albumin: number) => {
+    const correctedCa = calcium + 0.8 * (4 - albumin);
+    return correctedCa.toFixed(2);
+  };
+
 
   const renderStepIndicator = () => {
     const steps = [
@@ -212,6 +321,52 @@ export default function FollowUpVisits({user}: {user:any}) {
         </div>
       </div>
     );
+  };
+
+  const TestValidityIndicator = ({ testCode, label }: { testCode: string; label: string }) => {
+    const validity = testValidityData[testCode];
+    
+    if (!validity) {
+      return (
+        <div className="flex items-center space-x-2 text-gray-700">
+          <Clock className="w-4 h-4" />
+          <span className="text-sm font-medium">No previous data</span>
+        </div>
+      );
+    }
+
+    const { validityStatus, lastResult } = validity;
+    
+    if (validityStatus.isExpired) {
+      return (
+        <div className="flex items-center space-x-2 text-amber-700">
+          <AlertTriangle className="w-4 h-4" />
+          <div className="text-sm">
+            <div className="font-semibold">Test Needed</div>
+            <div className="text-xs font-medium text-gray-800">
+              Last: {lastResult ? `${lastResult.value} (${lastResult.formattedDate})` : 'Never tested'}
+            </div>
+            {validityStatus.daysSinceTest && (
+              <div className="text-xs font-medium text-gray-800">{validityStatus.daysSinceTest} days ago</div>
+            )}
+          </div>
+        </div>
+      );
+    } else if (validityStatus.isValid) {
+      return (
+        <div className="flex items-center space-x-2 text-green-700">
+          <CheckCircle className="w-4 h-4" />
+          <div className="text-sm">
+            <div className="font-semibold">Valid ({validityStatus.daysSinceTest} days)</div>
+            <div className="text-xs font-medium text-gray-800">
+              Last: {lastResult.value} ({lastResult.formattedDate})
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -270,55 +425,245 @@ export default function FollowUpVisits({user}: {user:any}) {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="space-y-6"
           >
-            {/* Patient Info Summary */}
             <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-blue-800 mb-4">Patient Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Name:</p>
-                  <p className="font-medium text-gray-900">{selectedPatient.name}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Age:</p>
-                  <p className="font-medium text-gray-900">{selectedPatient.age} years</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">National ID:</p>
-                  <p className="font-medium text-gray-900">{selectedPatient.nationalid}</p>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-blue-800">
+                  Lab Test Results - Follow-up Visit
+                </h3>
+                <div className="text-sm text-gray-600">
+                  Patient: {selectedPatient.name}
                 </div>
               </div>
+
+              {/* Validity Summary */}
+              {Object.keys(testValidityData).length > 0 && (
+                <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    <h4 className="font-semibold text-blue-900">Test Validity Summary</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="font-medium text-gray-800">{Object.values(testValidityData).filter((v: any) => v.validityStatus.isValid).length} tests still valid</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                      <span className="font-medium text-gray-800">{expiredTestsCount} tests need updating</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-4 h-4 text-gray-600" />
+                      <span className="font-medium text-gray-800">Pre-filled with valid values</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {validityLoading && (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="font-medium text-gray-800 mt-2">Checking test validity...</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* PTH */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      PTH (pg/mL)
+                    </label>
+                    <TestValidityIndicator testCode="PTH" label="PTH" />
+                  </div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={testValues.PTH}
+                    onChange={(e) => setTestValues({...testValues, PTH: e.target.value})}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-400"
+                    placeholder="Enter PTH value"
+                  />
+                </div>
+
+                {/* Calcium */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Calcium (mg/dL)
+                    </label>
+                    <TestValidityIndicator testCode="Ca" label="Calcium" />
+                  </div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={testValues.Ca}
+                    onChange={(e) => {
+                      const newCa = parseFloat(e.target.value) || 0;
+                      const albumin = parseFloat(testValues.Albumin) || 0;
+                      const correctedCa = calculateCorrectedCalcium(newCa, albumin);
+                      
+                      setTestValues({
+                        ...testValues, 
+                        Ca: e.target.value,
+                        CaCorrected: correctedCa
+                      });
+                    }}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-400"
+                    placeholder="Enter Calcium value"
+                  />
+                </div>
+
+                {/* Albumin */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Albumin (g/dL)
+                    </label>
+                    <TestValidityIndicator testCode="Albumin" label="Albumin" />
+                  </div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={testValues.Albumin}
+                    onChange={(e) => {
+                      const newAlbumin = parseFloat(e.target.value) || 0;
+                      const calcium = parseFloat(testValues.Ca) || 0;
+                      const correctedCa = calculateCorrectedCalcium(calcium, newAlbumin);
+                      
+                      setTestValues({
+                        ...testValues, 
+                        Albumin: e.target.value,
+                        CaCorrected: correctedCa
+                      });
+                    }}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-400"
+                    placeholder="Enter Albumin value"
+                  />
+                </div>
+
+                {/* Corrected Calcium - Make it readonly and show calculated value */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Corrected Calcium (mg/dL)
+                    </label>
+                    <TestValidityIndicator testCode="CaCorrected" label="Corrected Calcium" />
+                  </div>
+                  <input
+                    type="text"
+                    value={testValues.CaCorrected}
+                    readOnly
+                    className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-900 font-medium"
+                    placeholder="Auto-calculated"
+                  />
+                  <p className="text-xs text-gray-600">
+                    📊 Auto-calculated: Ca + 0.8 × (4 - Albumin)
+                  </p>
+                </div>
+                
+                {/* Phosphate */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Phosphate (mg/dL)
+                    </label>
+                    <TestValidityIndicator testCode="Phos" label="Phosphate" />
+                  </div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={testValues.Phos}
+                    onChange={(e) => setTestValues({...testValues, Phos: e.target.value})}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-400"
+                    placeholder="Enter Phosphate value"
+                  />
+                </div>
+
+                {/* Echo */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Echo
+                    </label>
+                    <TestValidityIndicator testCode="Echo" label="Echo" />
+                  </div>
+                  <select
+                    value={testValues.Echo}
+                    onChange={(e) => setTestValues({...testValues, Echo: e.target.value})}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-medium"
+                  >
+                    <option value="" className="text-gray-400">Select Echo result</option>
+                    <option value={0} className="text-gray-900 font-medium">Normal (0)</option>
+                    <option value={1} className="text-gray-900 font-medium">Abnormal (1)</option>
+                  </select>
+                </div>
+
+                {/* LA Rad */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">
+                      LA Rad
+                    </label>
+                    <TestValidityIndicator testCode="LARad" label="LA Rad" />
+                  </div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={testValues.LARad}
+                    onChange={(e) => setTestValues({...testValues, LARad: e.target.value})}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-400"
+                    placeholder="Enter LA Rad value"
+                  />
+              </div>
+
+                {/* Notes Section - if you have one */}
+                <div className="col-span-full space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Additional Notes (Optional)
+                  </label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={3}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-400"
+                    placeholder="Enter any additional notes about this follow-up visit..."
+                  />
+                </div>
+              </div>
+
+              {/* Warning for expired tests */}
+              {expiredTestsCount > 0 && (
+                <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-amber-900">
+                        {expiredTestsCount} test{expiredTestsCount > 1 ? 's' : ''} need updating
+                      </h4>
+                      <p className="text-sm font-medium text-gray-800 mt-1">
+                        Some tests have expired their validity period. While you can proceed with previous values 
+                        for emergency cases, it's recommended to order fresh tests for accurate diagnosis.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Test Input */}
-            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-blue-800 mb-4">New Test Results</h3>
-              <TestInputTable testValues={testValues} onChange={handleTestChange} />
-              
-              <div className="mt-6">
-                <label className="block text-gray-700 mb-2 font-medium">Notes (Optional)</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Additional notes about this visit..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-black h-24 resize-none"
-                />
-              </div>
-
-              <div className="flex justify-between mt-6">
-                <Button
-                  onClick={() => setCurrentStep("search")}
-                  className="px-6 border border-gray-300 bg-white text-gray-800 hover:bg-gray-100"
-                >
-                  Back to Search
-                </Button>
-                <Button
-                  onClick={handleSubmitTests}
-                  disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-                >
-                  {loading ? "Processing..." : "Submit Test Results"}
-                </Button>
-              </div>
+            <div className="flex justify-center space-x-4">
+              <Button
+                onClick={() => setCurrentStep("search")}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-8"
+              >
+                Back to Patient Selection
+              </Button>
+              <Button
+                onClick={handleSubmitTests}
+                disabled={loading}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+              >
+                {loading ? "Processing..." : "Classify & Get Recommendations"}
+              </Button>
             </div>
           </motion.div>
         )}
@@ -331,6 +676,25 @@ export default function FollowUpVisits({user}: {user:any}) {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="space-y-6"
           >
+            {/* Patient Summary */}
+            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
+              <h3 className="text-lg font-semibold text-blue-800 mb-4">New Patient Registered</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Name:</p>
+                  <p className="font-medium text-gray-900">{selectedPatient?.name || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Age:</p>
+                  <p className="font-medium text-gray-900">{selectedPatient?.age || 'N/A'} {selectedPatient?.age ? 'years' : ''}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Patient ID:</p>
+                  <p className="font-medium text-gray-900 text-xs">{selectedPatient?.id || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+
             {/* Classification Result */}
             <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
               <h3 className="text-lg font-semibold text-blue-800 mb-4">Classification Result</h3>
@@ -357,6 +721,38 @@ export default function FollowUpVisits({user}: {user:any}) {
               onRecommendationsSaved={handleRecommendationsSaved}
             />
 
+            {/* Enhanced Trend Analysis with Validity Information */}
+            {selectedPatient && (
+              <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-blue-800 flex items-center">
+                    <TrendingUp className="w-5 h-5 mr-2" />
+                    Lab Test Trends & History
+                  </h3>
+                  <div className="text-sm text-gray-600">
+                    Follow-up Visit Analysis
+                  </div>
+                </div>
+                
+                {/* Show message about latest data */}
+                <div className="mb-4 bg-blue-50 rounded-lg p-3">
+                  <p className="text-sm font-medium text-gray-800">
+                    <strong className="text-blue-900">✨ Latest Update:</strong> Graph includes data from this follow-up visit. 
+                    Fresh tests are highlighted with larger, solid points, while carried-forward values are shown with reduced opacity.
+                  </p>
+                </div>
+                
+                {/* TrendGraph with full functionality */}
+                <TrendGraph 
+                  key={`trend-followup-${selectedPatient.id}-${classificationResult?.labReportId || Date.now()}`}
+                  patientId={selectedPatient.id} 
+                  patientName={selectedPatient.name}
+                  showTitle={true}
+                  height={500}
+                />
+              </div>
+            )}
+
             <div className="flex justify-center">
               <Button
                 onClick={() => handleRecommendationsSaved([])}
@@ -368,6 +764,7 @@ export default function FollowUpVisits({user}: {user:any}) {
           </motion.div>
         )}
 
+        
         {/* Step 4: Complete */}
         {currentStep === "complete" && selectedPatient && classificationResult && (
           <motion.div
