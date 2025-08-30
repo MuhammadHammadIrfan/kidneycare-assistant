@@ -7,6 +7,7 @@ import PatientSearch from "../../../components/doctor/PatientSearch";
 import TestInputTable from "../../../components/doctor/TestInputTable";
 import RecommendationTable from "../../../components/doctor/RecommendationTable";
 import PatientReport from "../../../components/doctor/PatientReport";
+import MedicationRecommendation from "../../../components/doctor/MedicationRecommendation";
 import { Button } from "../../../components/ui/button";
 import { requireAuthServer } from "../../../lib/requireAuthServer";
 
@@ -83,6 +84,9 @@ export default function FollowUpVisits({user}: {user:any}) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [savedRecommendations, setSavedRecommendations] = useState<any[]>([]);
+  const [medicationsSaved, setMedicationsSaved] = useState(false);
+  const [savedMedications, setSavedMedications] = useState<any[]>([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [testValidityData, setTestValidityData] = useState<Record<string, any>>({});
   const [validityLoading, setValidityLoading] = useState(false);
   const [expiredTestsCount, setExpiredTestsCount] = useState(0);
@@ -206,8 +210,54 @@ export default function FollowUpVisits({user}: {user:any}) {
 
   const handleRecommendationsSaved = (recommendations: any[]) => {
     setSavedRecommendations(recommendations);
+    setSuccess("Recommendations saved successfully! You can now proceed to medications or complete the visit.");
+    // Don't automatically complete the visit here - let the user choose when to complete
+  };
+
+  const handleMedicationsSaved = () => {
+    setMedicationsSaved(true);
+    setSuccess("Medications saved successfully!");
+  };
+
+  const handleCompleteVisit = () => {
+    const hasRecommendations = savedRecommendations.length > 0;
+    const hasMedications = medicationsSaved;
+
+    // If both are saved or user wants to proceed anyway, complete the visit
+    if (hasRecommendations && hasMedications) {
+      fetchMedicationsForReport();
+      return;
+    }
+
+    // Show confirmation dialog if something is missing
+    setShowConfirmDialog(true);
+  };
+
+  const fetchMedicationsForReport = async () => {
+    if (!classificationResult?.labReportId) return;
+    
+    try {
+      const response = await fetch(`/api/doctor/patient/medication/get-saved?labReportId=${classificationResult.labReportId}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSavedMedications(data.medications || []);
+      } else {
+        console.error('Error fetching saved medications:', response.statusText);
+        setSavedMedications([]);
+      }
+    } catch (error) {
+      console.error('Error fetching medications for report:', error);
+      setSavedMedications([]);
+    }
+    
     setCurrentStep("complete");
     setSuccess("Follow-up visit completed successfully!");
+  };
+
+  const handleConfirmComplete = () => {
+    setShowConfirmDialog(false);
+    fetchMedicationsForReport();
   };
 
   const handleStartNewVisit = () => {
@@ -228,6 +278,10 @@ export default function FollowUpVisits({user}: {user:any}) {
     setClassificationResult(null);
     setError(null);
     setSuccess(null);
+    setSavedRecommendations([]);
+    setMedicationsSaved(false);
+    setSavedMedications([]);
+    setShowConfirmDialog(false);
   };
 
   const fetchTestValidity = async (patientId: string) => {
@@ -715,33 +769,32 @@ export default function FollowUpVisits({user}: {user:any}) {
             </div>
 
             {/* Recommendations Table */}
+
+            {/* Recommendations Table */}
             <RecommendationTable
               situationId={classificationResult.situationId}
               labReportId={classificationResult.labReportId}
               onRecommendationsSaved={handleRecommendationsSaved}
             />
 
+            {/* Medication Recommendation */}
+            <MedicationRecommendation
+              labReportId={classificationResult.labReportId}
+              testValues={testValues}
+              classification={classificationResult}
+              onSaved={handleMedicationsSaved}
+            />
+
             {/* Enhanced Trend Analysis with Validity Information */}
             {selectedPatient && (
               <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-blue-800 flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2" />
-                    Lab Test Trends & History
-                  </h3>
-                  <div className="text-sm text-gray-600">
-                    Follow-up Visit Analysis
-                  </div>
+                  {/* ...existing code... */}
                 </div>
-                
                 {/* Show message about latest data */}
                 <div className="mb-4 bg-blue-50 rounded-lg p-3">
-                  <p className="text-sm font-medium text-gray-800">
-                    <strong className="text-blue-900">✨ Latest Update:</strong> Graph includes data from this follow-up visit. 
-                    Fresh tests are highlighted with larger, solid points, while carried-forward values are shown with reduced opacity.
-                  </p>
+                  {/* ...existing code... */}
                 </div>
-                
                 {/* TrendGraph with full functionality */}
                 <TrendGraph 
                   key={`trend-followup-${selectedPatient.id}-${classificationResult?.labReportId || Date.now()}`}
@@ -755,7 +808,7 @@ export default function FollowUpVisits({user}: {user:any}) {
 
             <div className="flex justify-center">
               <Button
-                onClick={() => handleRecommendationsSaved([])}
+                onClick={handleCompleteVisit}
                 className="bg-green-600 hover:bg-green-700 text-white px-8"
               >
                 Complete Follow-up Visit
@@ -801,6 +854,7 @@ export default function FollowUpVisits({user}: {user:any}) {
               testValues={testValues}
               classification={classificationResult}
               recommendations={savedRecommendations}
+              medications={savedMedications}
               visitType="followup"
               doctorName={user?.name || "Dr. [Doctor Name]"}
               visitDate={new Date().toLocaleDateString()}
@@ -809,6 +863,58 @@ export default function FollowUpVisits({user}: {user:any}) {
           </motion.div>
         )}
       </main>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-2xl border-2 border-gray-300">
+            <div className="flex items-center mb-4">
+              <AlertTriangle className="w-6 h-6 text-amber-500 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Complete Visit</h3>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-gray-700 mb-3">
+                You are about to complete the visit, but it appears you haven't saved:
+              </p>
+              
+              <ul className="text-sm text-gray-600 mb-4 space-y-1">
+                {savedRecommendations.length === 0 && (
+                  <li className="flex items-center">
+                    <span className="w-2 h-2 bg-amber-400 rounded-full mr-2"></span>
+                    Treatment recommendations
+                  </li>
+                )}
+                {!medicationsSaved && (
+                  <li className="flex items-center">
+                    <span className="w-2 h-2 bg-amber-400 rounded-full mr-2"></span>
+                    Medication prescriptions
+                  </li>
+                )}
+              </ul>
+              
+              <p className="text-gray-700 text-sm">
+                Are you sure you want to complete the visit without saving these items?
+              </p>
+            </div>
+            
+            <div className="flex space-x-3">
+              <Button
+                onClick={() => setShowConfirmDialog(false)}
+                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white"
+              >
+                Go Back
+              </Button>
+              <Button
+                onClick={handleConfirmComplete}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              >
+                Complete Anyway
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

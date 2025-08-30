@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, User, TestTube, FileText, CheckCircle, TrendingUp } from "lucide-react";
+import { Menu, User, TestTube, FileText, CheckCircle, TrendingUp, AlertTriangle } from "lucide-react";
 import DoctorSidebar from "../../../components/doctor/DoctorSidebar";
 import PatientForm from "../../../components/doctor/PatientForm";
 import TestInputTable from "../../../components/doctor/TestInputTable";
 import RecommendationTable from "../../../components/doctor/RecommendationTable";
+import MedicationRecommendation from "../../../components/doctor/MedicationRecommendation";
 import PatientReport from "../../../components/doctor/PatientReport";
 import { Button } from "../../../components/ui/button";
 import { requireAuthServer } from "../../../lib/requireAuthServer";
@@ -51,6 +52,9 @@ export default function RegisterPatient({ user }: { user: any }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [savedRecommendations, setSavedRecommendations] = useState<any[]>([]);
+  const [medicationsSaved, setMedicationsSaved] = useState(false);
+  const [savedMedications, setSavedMedications] = useState<any[]>([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -120,8 +124,54 @@ export default function RegisterPatient({ user }: { user: any }) {
 
   const handleRecommendationsSaved = (recommendations: any[]) => {
     setSavedRecommendations(recommendations);
+    setSuccess("Recommendations saved successfully! You can now proceed to medications or complete the registration.");
+    // Don't automatically complete the registration here - let the user choose when to complete
+  };
+
+  const handleMedicationsSaved = () => {
+    setMedicationsSaved(true);
+    setSuccess("Medications saved successfully!");
+  };
+
+  const handleCompleteRegistration = () => {
+    const hasRecommendations = savedRecommendations.length > 0;
+    const hasMedications = medicationsSaved;
+
+    // If both are saved or user wants to proceed anyway, complete the registration
+    if (hasRecommendations && hasMedications) {
+      fetchMedicationsForReport();
+      return;
+    }
+
+    // Show confirmation dialog if something is missing
+    setShowConfirmDialog(true);
+  };
+
+  const fetchMedicationsForReport = async () => {
+    if (!classificationResult?.labReportId) return;
+    
+    try {
+      const response = await fetch(`/api/doctor/patient/medication/get-saved?labReportId=${classificationResult.labReportId}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSavedMedications(data.medications || []);
+      } else {
+        console.error('Error fetching saved medications:', response.statusText);
+        setSavedMedications([]);
+      }
+    } catch (error) {
+      console.error('Error fetching medications for report:', error);
+      setSavedMedications([]);
+    }
+    
     setCurrentStep("complete");
     setSuccess("Patient registration completed successfully!");
+  };
+
+  const handleConfirmComplete = () => {
+    setShowConfirmDialog(false);
+    fetchMedicationsForReport();
   };
 
   const handleStartNewRegistration = () => {
@@ -145,6 +195,10 @@ export default function RegisterPatient({ user }: { user: any }) {
     setClassificationResult(null);
     setError(null);
     setSuccess(null);
+    setSavedRecommendations([]);
+    setMedicationsSaved(false);
+    setSavedMedications([]);
+    setShowConfirmDialog(false);
   };
 
   const renderStepIndicator = () => {
@@ -354,6 +408,14 @@ export default function RegisterPatient({ user }: { user: any }) {
               onRecommendationsSaved={handleRecommendationsSaved}
             />
 
+            {/* Medication Recommendation */}
+            <MedicationRecommendation
+              labReportId={classificationResult.labReportId}
+              testValues={testValues}
+              classification={classificationResult}
+              onSaved={handleMedicationsSaved}
+            />
+
             {/* Trend Analysis for New Patient */}
             <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
               <h3 className="text-lg font-semibold text-blue-800 mb-4">Lab Test Trends</h3>
@@ -368,7 +430,7 @@ export default function RegisterPatient({ user }: { user: any }) {
 
             <div className="flex justify-center">
               <Button
-                onClick={() => handleRecommendationsSaved([])}
+                onClick={handleCompleteRegistration}
                 className="bg-green-600 hover:bg-green-700 text-white px-8"
               >
                 Complete Patient Registration
@@ -407,6 +469,7 @@ export default function RegisterPatient({ user }: { user: any }) {
               testValues={testValues}
               classification={classificationResult}
               recommendations={savedRecommendations}
+              medications={savedMedications}
               visitType="initial"
               doctorName={user?.name || "Dr. [Doctor Name]"}
               visitDate={new Date().toLocaleDateString()}
@@ -431,6 +494,58 @@ export default function RegisterPatient({ user }: { user: any }) {
           </motion.div>
         )}
       </main>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-2xl border-2 border-gray-300">
+            <div className="flex items-center mb-4">
+              <AlertTriangle className="w-6 h-6 text-amber-500 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Complete Registration</h3>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-gray-700 mb-3">
+                You are about to complete the patient registration, but it appears you haven't saved:
+              </p>
+              
+              <ul className="text-sm text-gray-600 mb-4 space-y-1">
+                {savedRecommendations.length === 0 && (
+                  <li className="flex items-center">
+                    <span className="w-2 h-2 bg-amber-400 rounded-full mr-2"></span>
+                    Treatment recommendations
+                  </li>
+                )}
+                {!medicationsSaved && (
+                  <li className="flex items-center">
+                    <span className="w-2 h-2 bg-amber-400 rounded-full mr-2"></span>
+                    Medication prescriptions
+                  </li>
+                )}
+              </ul>
+              
+              <p className="text-gray-700 text-sm">
+                Are you sure you want to complete the registration without saving these items?
+              </p>
+            </div>
+            
+            <div className="flex space-x-3">
+              <Button
+                onClick={() => setShowConfirmDialog(false)}
+                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white"
+              >
+                Go Back
+              </Button>
+              <Button
+                onClick={handleConfirmComplete}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              >
+                Complete Anyway
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

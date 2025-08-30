@@ -32,11 +32,20 @@ type RecommendationData = {
   category?: string;
 };
 
+type MedicationData = {
+  id: number;
+  name: string;
+  unit: string;
+  groupname: string;
+  dosage: number;
+};
+
 interface PatientReportProps {
   patient: PatientData;
   testValues: TestValues;
   classification: ClassificationResult;
   recommendations: RecommendationData[];
+  medications?: MedicationData[];
   visitType: "initial" | "followup";
   doctorName?: string;
   visitDate?: string;
@@ -48,6 +57,7 @@ export default function PatientReport({
   testValues,
   classification,
   recommendations,
+  medications = [],
   visitType,
   doctorName = "Dr. [Doctor Name]",
   visitDate = new Date().toLocaleDateString(),
@@ -364,6 +374,62 @@ export default function PatientReport({
           )}
         </div>
 
+        {/* Medication Prescriptions */}
+        <div className="mb-8">
+          <h3 className="text-lg font-bold text-black mb-4 p-3 bg-gray-100 border-l-4 border-blue-600">
+            Medication Prescriptions
+          </h3>
+          {medications.length > 0 ? (
+            (() => {
+              // Group medications by category
+              const groupedMedications = medications.reduce((acc, med) => {
+                if (!acc[med.groupname]) acc[med.groupname] = [];
+                acc[med.groupname].push(med);
+                return acc;
+              }, {} as Record<string, MedicationData[]>);
+
+              // Filter out medications with 0 dosage
+              const prescribedMedications = Object.keys(groupedMedications).reduce((acc, group) => {
+                const meds = groupedMedications[group].filter(med => med.dosage > 0);
+                if (meds.length > 0) {
+                  acc[group] = meds;
+                }
+                return acc;
+              }, {} as Record<string, MedicationData[]>);
+
+              return Object.keys(prescribedMedications).length > 0 ? (
+                <div className="space-y-4">
+                  {Object.keys(prescribedMedications).map(group => (
+                    <div key={group} className="border border-gray-300 rounded-lg">
+                      <div className="bg-blue-50 p-3 border-b border-gray-300">
+                        <h4 className="font-bold text-black">{group}</h4>
+                      </div>
+                      <div className="p-3">
+                        <div className="grid grid-cols-1 gap-2">
+                          {prescribedMedications[group].map(med => (
+                            <div key={med.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                              <span className="text-black font-medium">{med.name}</span>
+                              <span className="text-black font-bold">{med.dosage} {med.unit}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 border border-gray-300 bg-gray-50 rounded text-center">
+                  <p className="text-gray-600 italic">No medications prescribed for this visit.</p>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="p-4 border border-gray-300 bg-gray-50 rounded text-center">
+              <p className="text-gray-600 italic">No medication data available for this visit.</p>
+            </div>
+          )}
+        </div>
+
         {/* Clinical Notes */}
         {notes && (
           <div className="mb-8">
@@ -384,10 +450,12 @@ export default function PatientReport({
             </h4>
             <div className="text-black text-sm leading-relaxed space-y-2">
               <p>• Follow all medication instructions as prescribed by your doctor</p>
-              <p>• Attend all scheduled follow-up appointments</p>
+              <p>• Take medications at the same time each day for consistent results</p>
+              <p>• Do not stop or change medication dosages without consulting your doctor</p>
+              <p>• Attend all scheduled follow-up appointments for medication monitoring</p>
               <p>• Report any unusual symptoms or side effects immediately</p>
               <p>• Maintain a kidney-friendly diet as advised</p>
-              <p>• Keep this report for your medical records</p>
+              <p>• Keep this report for your medical records and bring it to your next visit</p>
             </div>
           </div>
         </div>

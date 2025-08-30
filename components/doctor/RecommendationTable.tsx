@@ -86,16 +86,17 @@ export default function RecommendationTable({
         throw new Error(data.error || "Failed to save recommendations");
       }
       
-      setSuccess("Recommendations saved!");
+      setSuccess("Recommendations saved successfully! You can now proceed to medications or complete the visit.");
       
-      // Prepare recommendations data for the report
-      const savedRecommendations = questions.map((q) => ({
-        questionText: q.questionText,
-        selectedOptionText: q.options.find(opt => opt.id === answers[q.questionId])?.text || "Not selected"
-      }));
-      
-      // Call the callback if provided
+      // Call the callback to notify parent component that recommendations are saved
       if (onRecommendationsSaved) {
+        // Create the recommendations array from current selections
+        const savedRecommendations = questions.map(q => ({
+          questionId: q.questionId,
+          questionText: q.questionText,
+          selectedOptionId: answers[q.questionId],
+          selectedOptionText: q.options.find(opt => opt.id === answers[q.questionId])?.text || ""
+        }));
         onRecommendationsSaved(savedRecommendations);
       }
       
