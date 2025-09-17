@@ -205,63 +205,62 @@ export default function TrendGraph({
   const generateSelectedChartData = () => {
     if (selectedTests.length === 0) return { labels: [], datasets: [] };
 
+    console.log('[TRENDGRAPH] ===== GENERATING CHART DATA =====');
+    console.log('[TRENDGRAPH] visitContext:', visitContext);
+    console.log('[TRENDGRAPH] selectedTests:', selectedTests);
+
     // Use visit timeline as x-axis
     const visits = visitContext.map((v) => `Visit ${v.visitNumber}`);
+    console.log('[TRENDGRAPH] Generated visit labels:', visits);
 
     const datasets = selectedTests
-      .map((testCode) => {
+      .map((testCode, datasetIndex) => {
         const test = trendData[testCode];
-        if (!test || !test.visitData) return null; // Add null check for visitData
+        if (!test || !test.visitData) {
+          console.log(`[TRENDGRAPH] No data for test ${testCode}`);
+          return null;
+        }
 
-        // Map test data to visit timeline
-        const data = visitContext.map((visit) => {
-          const testDataPoint = test.visitData.find(
-            (d) => d.visitNumber === visit.visitNumber
+        console.log(`[TRENDGRAPH] Processing test ${testCode} (dataset ${datasetIndex}):`);
+        console.log(`[TRENDGRAPH] API visitData:`, test.visitData);
+
+        // Ensure visitData length matches visitContext length
+        if (test.visitData.length !== visitContext.length) {
+          console.warn(
+            `[TRENDGRAPH] Length mismatch for ${testCode}: visitData=${test.visitData.length}, visitContext=${visitContext.length}`
           );
-          return testDataPoint ? testDataPoint.value : null;
+        }
+
+        // Direct 1:1 mapping since API ensures proper alignment
+        const data = test.visitData.map((visitPoint, index) => {
+          // Verify visit number alignment
+          if (visitPoint.visitNumber !== visitContext[index]?.visitNumber) {
+            console.warn(
+              `[TRENDGRAPH] Visit number mismatch at index ${index}: ${visitPoint.visitNumber} vs ${visitContext[index]?.visitNumber}`
+            );
+          }
+          
+          console.log(`[TRENDGRAPH] ${testCode} Visit ${visitPoint.visitNumber}: API=${visitPoint.value}, Chart=${visitPoint.value}`);
+          return visitPoint.value;
         });
+
+        console.log(`[TRENDGRAPH] Final chart data for ${testCode}:`, data);
 
         // Create point styles based on test freshness
-        const pointBackgroundColor = visitContext.map((visit) => {
-          const testDataPoint = test.visitData.find(
-            (d) => d.visitNumber === visit.visitNumber
-          );
-          if (!testDataPoint || testDataPoint.value === null) return 'transparent';
-
-          const baseColor = testColors[testCode as keyof typeof testColors];
-
-          if (testDataPoint.isCurrentTest) {
-            return baseColor; // Fresh test - solid color
-          } else if (
-            testDataPoint.daysSinceTest !== null &&
-            testDataPoint.daysSinceTest <= 30
-          ) {
-            return `${baseColor}CC`; // Recent test - 80% opacity
-          } else {
-            return `${baseColor}80`; // Older test - 50% opacity
-          }
+        const pointBackgroundColor = test.visitData.map((visitPoint) => {
+          if (visitPoint.value === null) return 'rgba(0,0,0,0)';
+          const baseColor = testColors[testCode as keyof typeof testColors] || '#6B7280';
+          return visitPoint.isCurrentTest ? baseColor : `${baseColor}CC`;
         });
 
-        const pointBorderColor = visitContext.map((visit) => {
-          const testDataPoint = test.visitData.find(
-            (d) => d.visitNumber === visit.visitNumber
-          );
-          if (!testDataPoint || testDataPoint.value === null) return 'transparent';
-          return testColors[testCode as keyof typeof testColors];
+        const pointBorderColor = test.visitData.map((visitPoint) => {
+          if (visitPoint.value === null) return 'rgba(0,0,0,0)';
+          return testColors[testCode as keyof typeof testColors] || '#6B7280';
         });
 
-        // Create point radius based on test freshness
-        const pointRadius = visitContext.map((visit) => {
-          const testDataPoint = test.visitData.find(
-            (d) => d.visitNumber === visit.visitNumber
-          );
-          if (!testDataPoint || testDataPoint.value === null) return 0;
-
-          if (testDataPoint.isCurrentTest) {
-            return 8; // Fresh test - larger point
-          } else {
-            return 6; // Older test - normal point
-          }
+        const pointRadius = test.visitData.map((visitPoint) => {
+          if (visitPoint.value === null) return 0;
+          return visitPoint.isCurrentTest ? 8 : 6;
         });
 
         return {
@@ -272,14 +271,20 @@ export default function TrendGraph({
           pointBackgroundColor,
           pointBorderColor,
           pointRadius,
-          pointHoverRadius: 10,
+          pointHoverRadius: test.visitData.map((visitPoint) => 
+            visitPoint.value === null ? 0 : 10
+          ),
           borderWidth: 3,
           fill: false,
-          spanGaps: true, // Connect points even with null values
+          spanGaps: true,
           tension: 0.4,
         };
       })
       .filter((dataset): dataset is NonNullable<typeof dataset> => dataset !== null);
+
+    console.log('[TRENDGRAPH] ===== FINAL CHART DATA =====');
+    console.log('[TRENDGRAPH] Labels:', visits);
+    console.log('[TRENDGRAPH] Datasets:', datasets.map(d => ({ label: d.label, data: d.data })));
 
     return {
       labels: visits,
@@ -294,6 +299,8 @@ export default function TrendGraph({
 
     if (availableTestsInGroup.length === 0) return null;
 
+    console.log(`[GROUPED CHART] ${groupName} - Available tests:`, availableTestsInGroup);
+
     const maxVisits = Math.max(
       ...availableTestsInGroup.map((test) => trendData[test].visitData?.length || 0)
     );
@@ -303,9 +310,11 @@ export default function TrendGraph({
     );
 
     const datasets = availableTestsInGroup
-      .map((testCode) => {
+      .map((testCode, datasetIndex) => {
         const test = trendData[testCode];
         if (!test || !test.visitData) return null;
+
+        console.log(`[GROUPED CHART] ${groupName} - Dataset ${datasetIndex}: ${testCode}`);
 
         const data = visits.map((_, visitIndex) => {
           const testData = test.visitData.find(
@@ -330,7 +339,9 @@ export default function TrendGraph({
       })
       .filter(
         (dataset): dataset is NonNullable<typeof dataset> => dataset !== null
-      ); // FIX: Type-safe filter
+      );
+
+    console.log(`[GROUPED CHART] ${groupName} - Final datasets order:`, datasets.map(d => d.label));
 
     return {
       labels: visits,
@@ -367,8 +378,9 @@ export default function TrendGraph({
     };
   };
 
-  // Chart options
-  const chartOptions: ChartOptions<'line'> = {
+  // Update the chartOptions to be view-aware
+const createChartOptions = (currentView: 'combined' | 'grouped' | 'individual', testCodesForThisChart?: string[], groupName?: string, singleTestCode?: string): ChartOptions<'line'> => {
+  return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -391,87 +403,132 @@ export default function TrendGraph({
         bodyColor: 'white',
         borderColor: 'rgba(255, 255, 255, 0.2)',
         borderWidth: 1,
-        bodyFont: {
-          size: 13,
-        },
-        titleFont: {
-          size: 14,
-          weight: 'bold',
+        bodyFont: { size: 13 },
+        titleFont: { size: 14, weight: 'bold' },
+        filter: (tooltipItem) => {
+          return tooltipItem.parsed.y !== null;
         },
         callbacks: {
           title: (context) => {
-            const visitNum = context[0].dataIndex + 1;
-            const visit = visitContext.find((v) => v.visitNumber === visitNum);
-            return visit
-              ? `Visit ${visitNum} - ${visit.formattedDate}`
-              : `Visit ${visitNum}`;
+            const pointIndex = context[0].dataIndex;
+            const visitNum = pointIndex + 1;
+            
+            const visit = visitContext[pointIndex];
+            if (visit) {
+              return `Visit ${visitNum} - ${visit.formattedDate}`;
+            }
+            return `Visit ${visitNum}`;
           },
           label: (context) => {
-            // Fix: Safely get the test code and test data
-            const testCode = selectedTests[context.datasetIndex];
-            if (!testCode || !trendData[testCode]) {
+            const datasetIndex = context.datasetIndex;
+            const pointIndex = context.dataIndex;
+            
+            // FIXED: Determine test code based on current view
+            let testCode: string;
+            
+            if (currentView === 'combined') {
+              // Selected Tests View - use selectedTests array
+              testCode = selectedTests[datasetIndex];
+            } else if (currentView === 'individual') {
+              // Individual Chart View - use the single test code for this chart
+              testCode = singleTestCode!;
+            } else if (currentView === 'grouped') {
+              // Medical Groups View - use the test codes for this specific group
+              testCode = testCodesForThisChart![datasetIndex];
+            } else {
+              console.warn(`[TOOLTIP] Unknown view: ${currentView}`);
+              return `${context.dataset.label}: Unknown view`;
+            }
+            
+            console.log(`[TOOLTIP] View: ${currentView}, Dataset ${datasetIndex}, Point ${pointIndex}, Test ${testCode}`);
+            
+            if (!testCode || !trendData[testCode] || !trendData[testCode].visitData) {
+              console.warn(`[TOOLTIP] No data for test ${testCode}`);
               return `${context.dataset.label}: No data available`;
             }
             
-            const test = trendData[testCode];
-            if (!test.visitData) {
-              return `${context.dataset.label}: No visit data`;
-            }
+            // Get the exact visitPoint from API data
+            const visitPoint = trendData[testCode].visitData[pointIndex];
             
-            const visitNum = context.dataIndex + 1;
-            const testDataPoint = test.visitData.find(
-              (d) => d.visitNumber === visitNum
-            );
-
-            if (!testDataPoint || testDataPoint.value === null) {
+            console.log(`[TOOLTIP] Visit point for ${testCode}:`, visitPoint);
+            
+            if (!visitPoint || visitPoint.value === null) {
+              console.warn(`[TOOLTIP] No valid test data for ${testCode} at point ${pointIndex}`);
               return `${context.dataset.label}: No valid test data`;
             }
 
-            let label = `${context.dataset.label}: ${testDataPoint.value}`;
+            // Use the EXACT value from API (visitPoint.value)
+            const apiValue = visitPoint.value;
+            const chartValue = context.parsed.y;
+            
+            // Debug: Check if values match
+            if (Math.abs(apiValue - chartValue) > 0.01) {
+              console.warn(`[TOOLTIP] Value mismatch! API: ${apiValue}, Chart: ${chartValue}`);
+            }
 
-            if (testDataPoint.isCurrentTest) {
-              label += ` ✨ (Fresh - tested this visit)`;
-            } else if (testDataPoint.daysSinceTest !== null) {
-              if (testDataPoint.daysSinceTest === 0) {
-                label += ` ✨ (Same day)`;
-              } else if (testDataPoint.daysSinceTest <= 7) {
-                label += ` 🕐 (${testDataPoint.daysSinceTest} days ago)`;
-              } else if (testDataPoint.daysSinceTest <= 30) {
-                label += ` ⏳ (${testDataPoint.daysSinceTest} days ago)`;
+            // Always use API value for accuracy
+            let label = `${trendData[testCode].metadata.name}: ${apiValue} ${trendData[testCode].metadata.unit}`;
+
+            // Add status information
+            if (visitPoint.isCurrentTest) {
+              label += ` (Current visit test)`;
+            } else if (visitPoint.daysSinceTest !== null) {
+              if (visitPoint.daysSinceTest === 0) {
+                label += ` (Same day)`;
+              } else if (visitPoint.daysSinceTest <= 7) {
+                label += ` (${visitPoint.daysSinceTest} days ago)`;
+              } else if (visitPoint.daysSinceTest <= 30) {
+                label += ` (${visitPoint.daysSinceTest} days ago)`;
               } else {
-                label += ` ⚠️ (${testDataPoint.daysSinceTest} days ago)`;
+                label += ` (${visitPoint.daysSinceTest} days ago - older test)`;
               }
+            }
 
-              if (testDataPoint.testDate) {
-                label += ` - Test date: ${testDataPoint.testDate}`;
-              }
+            // Add test date if available
+            if (visitPoint.testDate) {
+              label += ` - Test date: ${visitPoint.testDate}`;
             }
 
             return label;
           },
           afterBody: (context) => {
-            const visitNum = context[0].dataIndex + 1;
-            const visit = visitContext.find((v) => v.visitNumber === visitNum);
-            const additionalInfo = [];
-
-            if (visit?.situation) {
-              additionalInfo.push(
-                `📊 Classification: Group ${visit.situation.groupid}, ${visit.situation.code}`
-              );
+            const pointIndex = context[0].dataIndex;
+            const visitNum = pointIndex + 1;
+            
+            // Determine which tests to check for missing data based on current view
+            let testsToCheck: string[];
+            
+            if (currentView === 'combined') {
+              testsToCheck = selectedTests;
+            } else if (currentView === 'individual') {
+              testsToCheck = [singleTestCode!];
+            } else if (currentView === 'grouped') {
+              testsToCheck = testCodesForThisChart!;
+            } else {
+              return [];
             }
+            
+            // Check which tests are missing for this visit
+            const missingTests = testsToCheck.filter(testCode => {
+              const test = trendData[testCode];
+              if (!test || !test.visitData) return false;
+              const visitPoint = test.visitData[pointIndex];
+              return !visitPoint || visitPoint.value === null;
+            });
 
-            // Add validity information for the first test in tooltip
-            if (context.length > 0) {
-              const testCode = selectedTests[0];
-              if (testCode && trendData[testCode]) {
+            if (missingTests.length > 0) {
+              const missingTestNames = missingTests.map(testCode => {
                 const test = trendData[testCode];
-                additionalInfo.push(
-                  `⏱️ Test validity: ${test.metadata.validityMonths} month(s)`
-                );
-              }
+                return test ? test.metadata.name : testCode;
+              });
+              
+              return [
+                ``,
+                `Missing data for Visit ${visitNum}:`,
+                ...missingTestNames.map(name => `• ${name}`)
+              ];
             }
-
-            return additionalInfo;
+            return [];
           },
         },
       },
@@ -481,27 +538,17 @@ export default function TrendGraph({
         title: {
           display: true,
           text: 'Visits Over Time',
-          font: {
-            size: 14,
-            weight: 'bold',
-          },
+          font: { size: 14, weight: 'bold' },
         },
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)',
-        },
+        grid: { color: 'rgba(0, 0, 0, 0.1)' },
       },
       y: {
         title: {
           display: true,
           text: 'Test Values',
-          font: {
-            size: 14,
-            weight: 'bold',
-          },
+          font: { size: 14, weight: 'bold' },
         },
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)',
-        },
+        grid: { color: 'rgba(0, 0, 0, 0.1)' },
         beginAtZero: false,
       },
     },
@@ -510,7 +557,17 @@ export default function TrendGraph({
       axis: 'x',
       intersect: false,
     },
+    elements: {
+      point: {
+        hoverRadius: 12,
+      },
+      line: {
+        tension: 0.4,
+        spanGaps: true,
+      },
+    },
   };
+};
 
   const handleTestSelection = (testCode: string) => {
     setSelectedTests((prev) =>
@@ -738,7 +795,10 @@ export default function TrendGraph({
         // Selected Tests Chart
         <div style={{ height: `${height}px` }}>
           {selectedTests.length > 0 ? (
-            <Line data={generateSelectedChartData()} options={chartOptions} />
+            <Line 
+              data={generateSelectedChartData()} 
+              options={createChartOptions('combined')} 
+            />
           ) : (
             <div className='flex items-center justify-center h-full text-gray-500'>
               Select at least one test to view trends
@@ -752,6 +812,9 @@ export default function TrendGraph({
             const chartData = generateGroupedChartData(groupName);
             if (!chartData) return null;
 
+            // FIXED: Get the actual test codes for this group
+            const availableTestsInGroup = group.tests.filter((test) => trendData[test] && trendData[test].visitData);
+
             return (
               <div
                 key={groupName}
@@ -764,7 +827,10 @@ export default function TrendGraph({
                   {group.description}
                 </p>
                 <div style={{ height: '300px' }}>
-                  <Line data={chartData} options={chartOptions} />
+                  <Line 
+                    data={chartData} 
+                    options={createChartOptions('grouped', availableTestsInGroup, groupName)} 
+                  />
                 </div>
               </div>
             );
@@ -792,7 +858,10 @@ export default function TrendGraph({
                   {trendData[testCode].metadata.name}
                 </h4>
                 <div style={{ height: '250px' }}>
-                  <Line data={chartData} options={chartOptions} />
+                  <Line 
+                    data={chartData} 
+                    options={createChartOptions('individual', undefined, undefined, testCode)} 
+                  />
                 </div>
               </div>
             );

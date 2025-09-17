@@ -18,25 +18,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Get saved medication prescriptions for this lab report
-    const { data: prescriptions, error: prescError } = await supabaseAdmin
+    // Get ACTIVE saved medications for this report - FIXED
+    const { data: savedMedications, error: medicationsError } = await supabaseAdmin
       .from("MedicationPrescription")
       .select(`
+        id,
         medicationtypeid,
         dosage,
-        MedicationType!inner(id, name, unit, groupname)
+        createdat,
+        isoutdated,
+        outdatedat,
+        outdatedreason,
+        MedicationType (
+          id,
+          name,
+          unit,
+          groupname
+        )
       `)
       .eq("reportid", labReportId)
-      .gt("dosage", 0); // Only get medications with dosage > 0
+      .eq("isoutdated", false) // Only get active medications
+      .order("createdat", { ascending: false });
 
-    console.log("[GET_SAVED_MEDICATIONS] Found prescriptions:", prescriptions?.length || 0);
-    if (prescError) {
-      console.error("[GET_SAVED_MEDICATIONS] Error fetching prescriptions:", prescError);
-      return res.status(500).json({ error: "Failed to fetch medication prescriptions" });
+    if (medicationsError) {
+      console.error("Saved medications fetch error:", medicationsError);
+      return res.status(500).json({ error: "Failed to fetch saved medications" });
     }
 
+    // Also get outdated medications count for information
+    const { data: outdatedCount } = await supabaseAdmin
+      .from("MedicationPrescription")
+      .select("id")
+      .eq("reportid", labReportId)
+      .eq("isoutdated", true);
+
+    console.log(`[GET SAVED] Found ${savedMedications?.length || 0} active and ${outdatedCount?.length || 0} outdated medications`);
+
     // Transform the data to match the expected format
-    const medications = (prescriptions || []).map(presc => {
+    const medications = (savedMedications || []).map(presc => {
       const medType = presc.MedicationType as any;
       return {
         id: medType.id,
@@ -48,7 +67,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     console.log("[GET_SAVED_MEDICATIONS] Returning medications:", medications.length);
-    res.status(200).json({ medications });
+    res.status(200).json({
+      success: true,
+      medications,
+      totalActive: savedMedications?.length || 0,
+      totalOutdated: outdatedCount?.length || 0,
+      message: `Found ${medications.length} active saved medications${
+        outdatedCount?.length ? ` (${outdatedCount.length} outdated excluded)` : ''
+      }`
+    });
     
   } catch (error) {
     console.error("[GET_SAVED_MEDICATIONS] Unexpected error:", error);

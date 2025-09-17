@@ -8,7 +8,7 @@ const navLinks = [
   { href: "/doctor/dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5 mr-2" /> },
   { href: "/doctor/patient/register", label: "Register Patient", icon: <UserPlus className="w-5 h-5 mr-2" /> },
   { href: "/doctor/patient/followup", label: "Follow-up Visit", icon: <UserSearch className="w-5 h-5 mr-2" /> },
-  { href: "/doctor/recommendations", label: "Recommendations", icon: <History className="w-5 h-5 mr-2" /> },
+  { href: "/doctor/patient-history", label: "Patient History", icon: <History className="w-5 h-5 mr-2" /> },
   { href: "/doctor/stats", label: "Lab/Test Trends", icon: <BarChart2 className="w-5 h-5 mr-2" /> },
 ];
 

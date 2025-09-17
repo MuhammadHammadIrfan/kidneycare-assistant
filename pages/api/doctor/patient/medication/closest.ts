@@ -28,8 +28,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   console.log("[CLOSEST_API] Normalized test values:", normalizedTestValues);
 
   try {
-    // Find closest lab report with medication
-    console.log("[CLOSEST_API] Searching for closest report...");
+    // Find closest lab report with ACTIVE medication (will be filtered for active ones)
+    console.log("[CLOSEST_API] Searching for closest report with active medications...");
     const closestReport = await findClosestLabReportWithMedication(normalizedTestValues);
     
     if (!closestReport) {
@@ -68,14 +68,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("[CLOSEST_API] Found closest report:", closestReport.id);
 
-    // Get medication prescriptions for this report
+    // Get ACTIVE medication prescriptions for this report - FIXED
     const { data: prescriptions, error: prescError } = await supabaseAdmin
       .from("MedicationPrescription")
-      .select("medicationtypeid, dosage")
-      .eq("reportid", closestReport.id);
+      .select("medicationtypeid, dosage, isoutdated")
+      .eq("reportid", closestReport.id)
+      .eq("isoutdated", false); // Only get active medications
 
-    console.log("[CLOSEST_API] Found prescriptions:", prescriptions?.length || 0);
-    if (prescError) console.error("[CLOSEST_API] Error fetching prescriptions:", prescError);
+    console.log("[CLOSEST_API] Found ACTIVE prescriptions:", prescriptions?.length || 0);
+    
+    if (prescError) {
+      console.error("[CLOSEST_API] Error fetching prescriptions:", prescError);
+      return res.status(500).json({ error: "Failed to fetch prescriptions" });
+    }
 
     // Get all medication types
     const { data: medTypes, error: medTypesError } = await supabaseAdmin
@@ -135,6 +140,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("[CLOSEST_API] Extracted test results with codes:", testResults);
 
+    // Get medications for the closest report with active filter
+    let closestMedications: any[] = [];
+    if (closestReport) {
+      const { data: medicationData, error: medicationError } = await supabaseAdmin
+        .from("MedicationPrescription")
+        .select(`
+          id,
+          medicationtypeid,
+          dosage,
+          MedicationType (
+            id,
+            name,
+            unit,
+            groupname
+          )
+        `)
+        .eq("reportid", closestReport.id)
+        .or("isoutdated.is.null,isoutdated.eq.false"); // Get active medications
+
+      if (!medicationError && medicationData) {
+        closestMedications = medicationData.map(med => {
+          const medicationType = Array.isArray(med.MedicationType) ? med.MedicationType[0] : med.MedicationType;
+          return {
+            id: med.id,
+            medicationtypeid: med.medicationtypeid,
+            dosage: med.dosage,
+            MedicationType: medicationType
+          };
+        }).filter(med => med.MedicationType !== null);
+      }
+    }
+
     const response = {
       closest: {
         id: closestReport.id,
@@ -142,7 +179,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         reportDate: closestReport.reportdate
       },
       medications,
-      testResults
+      testResults,
+      closestMedications
     };
 
     console.log("[CLOSEST_API] Returning successful response with", medications.length, "medications");
@@ -152,4 +190,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error("[CLOSEST_API] Unexpected error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
+}
+
+// Helper function to find closest report with active medications
+async function findClosestLabReportWithActiveMedication(testValues: any) {
+  // This should be added to your medicationMatcher.ts file
+  // Updated to only consider reports with active (non-outdated) medications
+  
+  const { data: reportsWithMedications, error } = await supabaseAdmin
+    .from("LabReport")
+    .select(`
+      id,
+      patientid,
+      reportdate,
+      MedicationPrescription!inner (
+        id,
+        isoutdated
+      ),
+      LabReportTestLink (
+        TestResult (
+          value,
+          TestType (
+            code
+          )
+        )
+      )
+    `)
+    .eq("MedicationPrescription.isoutdated", false) // Only reports with active medications
+    .order("reportdate", { ascending: false });
+
+  // ... existing similarity matching logic
 }

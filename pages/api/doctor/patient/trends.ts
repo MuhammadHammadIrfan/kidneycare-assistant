@@ -41,38 +41,27 @@ export default async function handler(
         .json({ error: 'Patient not found', details: patientError });
     }
 
-    // Get all test results with validity information
-    const { data: testResults, error: testError } = await supabaseAdmin
-    .from("TestResult")
-    .select(`
-        id,
-        value,
-        testdate,
-        testtypeid,
-        TestType!TestResult_testtypeid_fkey (
-        id,
-        code,
-        name,
-        unit,
-        validitymonths
-        )
-    `)
-    .eq("patientid", patientId)
-    .order("testdate", { ascending: true });
-
-    if (testError) {
-      console.error('[TRENDS API] Test results fetch error:', testError);
-      return res
-        .status(500)
-        .json({ error: 'Failed to fetch test results', details: testError });
-    }
-
-    // Get all lab reports
+    // FIXED: Get lab reports EXACTLY like patient-history API
     const { data: labReports, error: reportsError } = await supabaseAdmin
       .from('LabReport')
-      .select('id, reportdate, situationid')
+      .select(`
+        id,
+        reportdate,
+        notes,
+        situationid,
+        createdat,
+        lastmodified,
+        lastmodifiedby,
+        Situation (
+          id,
+          groupid,
+          bucketid,
+          code,
+          description
+        )
+      `)
       .eq('patientid', patientId)
-      .order('reportdate', { ascending: true });
+      .order('reportdate', { ascending: true }); // Keep ascending for timeline
 
     if (reportsError) {
       console.error('[TRENDS API] Lab reports fetch error:', reportsError);
@@ -81,171 +70,212 @@ export default async function handler(
         .json({ error: 'Failed to fetch lab reports', details: reportsError });
     }
 
-    // Get situation details separately
-    const situationIds =
-      labReports?.map((report) => report.situationid).filter(Boolean) || [];
+    console.log(`[TRENDS API] Found ${labReports?.length || 0} lab reports`);
 
-    let situationsMap: Record<string, any> = {};
-
-    if (situationIds.length > 0) {
-      const { data: situations, error: situationsError } = await supabaseAdmin
-        .from('Situation')
-        .select('id, groupid, code, description')
-        .in('id', situationIds);
-
-      if (situationsError) {
-        console.error('[TRENDS API] Situations fetch error:', situationsError);
-      } else {
-        situationsMap =
-          situations?.reduce((acc, situation) => {
-            acc[situation.id] = situation;
-            return acc;
-          }, {} as Record<string, any>) || {};
-      }
-    }
-
-    // Create visit timeline
-    const visitTimeline =
-      labReports?.map((report, index) => {
-        return {
-          visitNumber: index + 1,
-          date: new Date(report.reportdate),
-          formattedDate: new Date(report.reportdate).toLocaleDateString(),
-          situation: situationsMap[report.situationid] || null,
-        };
-      }) || [];
-
-    // Handle case where no test results exist
-    if (!testResults || testResults.length === 0) {
-      console.log(`[TRENDS API] No test results found for patient ${patientId}`);
+    if (!labReports || labReports.length === 0) {
+      console.log(`[TRENDS API] No lab reports found for patient ${patientId}`);
       return res.status(200).json({
         patient: patientData,
         trendData: {},
-        visitContext: visitTimeline,
-        totalVisits: visitTimeline.length,
+        visitContext: [],
+        totalVisits: 0,
         debug: {
           testResultsCount: 0,
-          labReportsCount: labReports?.length || 0,
+          labReportsCount: 0,
           processedTestTypes: [],
           timestamp: new Date().toISOString(),
-          message: 'No test results found for this patient',
+          message: 'No lab reports found for this patient',
         },
       });
     }
 
-    // Group test results by test type
+    // Create visit timeline from lab reports (SAME as patient-history)
+    const visitTimeline = labReports.map((report, index) => {
+      const situation = Array.isArray(report.Situation) ? report.Situation[0] : report.Situation;
+      return {
+        visitNumber: index + 1,
+        date: new Date(report.reportdate),
+        formattedDate: new Date(report.reportdate).toLocaleDateString(),
+        reportId: report.id,
+        situation: situation || null,
+      };
+    });
+
+    console.log('[TRENDS API] Created visit timeline:', visitTimeline);
+
+    // FIXED: Get test results for each lab report EXACTLY like patient-history API
+    const allTestResultsByReport: Record<string, any[]> = {};
+    const allTestTypes: Record<string, any> = {};
+
+    for (const report of labReports) {
+      console.log(`[TRENDS API] Processing test results for lab report ${report.id}`);
+      
+      // FIXED: Use LabReportTestLink EXACTLY like patient-history API
+      const { data: testLinks, error: testLinksError } = await supabaseAdmin
+        .from("LabReportTestLink")
+        .select(`
+          testresultid,
+          TestResult (
+            id,
+            value,
+            testdate,
+            testtypeid,
+            lastmodified,
+            lastmodifiedby,
+            createdat,
+            TestType!TestResult_testtypeid_fkey (
+              id,
+              code,
+              name,
+              unit,
+              validitymonths
+            )
+          )
+        `)
+        .eq("labreportid", report.id);
+
+      if (testLinksError) {
+        console.error(`[TRENDS API] Test links fetch error for report ${report.id}:`, testLinksError);
+        allTestResultsByReport[report.id] = [];
+        continue;
+      }
+
+      // FIXED: Process test results EXACTLY like patient-history API
+      const testResults = (testLinks || [])
+        .map(link => {
+          const testResult = link.TestResult;
+          if (!testResult) return null;
+          
+          const result = Array.isArray(testResult) ? testResult[0] : testResult;
+          if (!result) return null;
+
+          const testType = Array.isArray(result.TestType) ? result.TestType[0] : result.TestType;
+          if (!testType) return null;
+
+          // Store test type info for later use
+          allTestTypes[testType.code] = testType;
+          
+          return {
+            ...result,
+            testdate: new Date(result.testdate),
+            TestType: testType
+          };
+        })
+        .filter(result => result !== null);
+
+      allTestResultsByReport[report.id] = testResults;
+      console.log(`[TRENDS API] Found ${testResults.length} test results for report ${report.id}`);
+    }
+
+    // FIXED: Group test results by test type across all reports
     const testsByType: Record<string, any[]> = {};
 
-    testResults.forEach((result: any) => {
-      if (!result.TestType) {
-        return;
-      }
+    Object.entries(allTestResultsByReport).forEach(([reportId, testResults]) => {
+      testResults.forEach((result: any) => {
+        const testCode = result.TestType.code;
+        
+        if (!testsByType[testCode]) {
+          testsByType[testCode] = [];
+        }
 
-      const testCode = result.TestType.code;
-
-      if (!testsByType[testCode]) {
-        testsByType[testCode] = [];
-      }
-
-      testsByType[testCode].push({
-        ...result,
-        testdate: new Date(result.testdate),
+        testsByType[testCode].push({
+          ...result,
+          reportId, // Keep track of which report this belongs to
+        });
       });
     });
 
-    // Handle case where no visits exist but test results do
-    if (visitTimeline.length === 0) {
-      // Create visits based on unique test dates
-      const uniqueTestDates = [
-        ...new Set(testResults.map((r) => r.testdate)),
-      ].sort();
+    console.log('[TRENDS API] Grouped tests by type:', Object.keys(testsByType));
 
-      const dateBasedTimeline = uniqueTestDates.map((dateStr, index) => ({
-        visitNumber: index + 1,
-        date: new Date(dateStr),
-        formattedDate: new Date(dateStr).toLocaleDateString(),
-        situation: null,
-      }));
-
-      visitTimeline.push(...dateBasedTimeline);
-    }
-
-    // Process trend data with validity logic
+    // FIXED: Process trend data using EXACT timeline from lab reports
     const processedTrendData: Record<string, any> = {};
 
     Object.entries(testsByType).forEach(([testCode, results]) => {
-      const testInfo = results[0].TestType;
+      const testInfo = allTestTypes[testCode];
       const validityMonths = testInfo.validitymonths || 1;
 
-      // Calculate test values for each visit
+      console.log(`[TRENDS API] Processing ${testCode} for ${visitTimeline.length} visits`);
+
+      // FIXED: Calculate test values for each visit using lab report timeline
       const visitData = visitTimeline.map((visit) => {
-        // Find ALL test results before or on this visit date that are within validity
+        console.log(`[TRENDS API] Processing visit ${visit.visitNumber} (${visit.formattedDate}) for ${testCode}`);
+        
+        // STEP 1: Check if this visit (lab report) has a test result for this test type
+        const sameReportTest = results.find(result => result.reportId === visit.reportId);
+        
+        if (sameReportTest) {
+          console.log(`[TRENDS API] Found same-report test for ${testCode} at visit ${visit.visitNumber}: ${sameReportTest.value}`);
+          return {
+            visitNumber: visit.visitNumber,
+            visitDate: visit.formattedDate,
+            value: parseFloat(sameReportTest.value),
+            testDate: sameReportTest.testdate.toLocaleDateString(),
+            isCurrentTest: true, // Test from same report/visit
+            daysSinceTest: 0,
+            testId: sameReportTest.id,
+          };
+        }
+
+        // STEP 2: No test in current report, look for valid tests from previous reports within validity period
         const validResults = results.filter((result) => {
           const testDate = result.testdate;
           const visitDate = visit.date;
 
-          // Test must be done before or on visit date
-          if (testDate > visitDate) return false;
+          // Test must be done before this visit date
+          if (testDate >= visitDate) return false;
 
           // Test must be within validity period
-          const daysDiff =
-            (visitDate.getTime() - testDate.getTime()) / (1000 * 60 * 60 * 24);
+          const daysDiff = (visitDate.getTime() - testDate.getTime()) / (1000 * 60 * 60 * 24);
           return daysDiff <= validityMonths * 30;
         });
 
-        // Priority logic: prefer same-day tests over older tests
-        let mostRecentValid = null;
+        console.log(`[TRENDS API] Found ${validResults.length} valid previous results for ${testCode} at visit ${visit.visitNumber}`);
 
         if (validResults.length > 0) {
-          // First, check for tests done on the EXACT same day as the visit
-          const sameDayTests = validResults.filter(
-            (result) =>
-              result.testdate.toDateString() === visit.date.toDateString()
-          );
+          // Use the most recent valid test from before this visit
+          const mostRecentValid = validResults.sort(
+            (a, b) => b.testdate.getTime() - a.testdate.getTime()
+          )[0];
 
-          if (sameDayTests.length > 0) {
-            // Use the most recent test from the same day (in case multiple tests on same day)
-            mostRecentValid = sameDayTests.sort(
-              (a, b) => b.testdate.getTime() - a.testdate.getTime()
-            )[0];
-          } else {
-            // No same-day test, use the most recent valid test from before
-            mostRecentValid = validResults.sort(
-              (a, b) => b.testdate.getTime() - a.testdate.getTime()
-            )[0];
-          }
+          const daysSinceTest = Math.floor((visit.date.getTime() - mostRecentValid.testdate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          console.log(`[TRENDS API] Using previous test for ${testCode} at visit ${visit.visitNumber}: ${mostRecentValid.value} (${daysSinceTest} days ago)`);
+
+          return {
+            visitNumber: visit.visitNumber,
+            visitDate: visit.formattedDate,
+            value: parseFloat(mostRecentValid.value),
+            testDate: mostRecentValid.testdate.toLocaleDateString(),
+            isCurrentTest: false,
+            daysSinceTest,
+            testId: mostRecentValid.id,
+          };
+        } else {
+          console.log(`[TRENDS API] No valid test found for ${testCode} at visit ${visit.visitNumber}`);
+          return {
+            visitNumber: visit.visitNumber,
+            visitDate: visit.formattedDate,
+            value: null,
+            testDate: null,
+            isCurrentTest: false,
+            daysSinceTest: null,
+            testId: null,
+          };
         }
-
-        const visitPoint = {
-          visitNumber: visit.visitNumber,
-          visitDate: visit.formattedDate,
-          value: mostRecentValid ? parseFloat(mostRecentValid.value) : null,
-          testDate: mostRecentValid
-            ? mostRecentValid.testdate.toLocaleDateString()
-            : null,
-          isCurrentTest: mostRecentValid
-            ? mostRecentValid.testdate.toDateString() ===
-              visit.date.toDateString()
-            : false,
-          daysSinceTest: mostRecentValid
-            ? Math.floor(
-                (visit.date.getTime() - mostRecentValid.testdate.getTime()) /
-                  (1000 * 60 * 60 * 24)
-              )
-            : null,
-          testId: mostRecentValid ? mostRecentValid.id : null,
-        };
-
-        return visitPoint;
       });
 
-      // Also include all actual test results for reference
-      const allTestResults = results.map((result) => ({
-        id: result.id,
-        value: parseFloat(result.value),
-        testDate: result.testdate.toLocaleDateString(),
-        testDateObj: result.testdate,
-      }));
+      console.log(`[TRENDS API] Final visitData for ${testCode}:`, visitData);
+
+      // Include all test results for reference (sorted by date)
+      const allTestResults = results
+        .sort((a, b) => a.testdate.getTime() - b.testdate.getTime())
+        .map((result) => ({
+          id: result.id,
+          value: parseFloat(result.value),
+          testDate: result.testdate.toLocaleDateString(),
+          testDateObj: result.testdate,
+          reportId: result.reportId,
+        }));
 
       processedTrendData[testCode] = {
         metadata: {
@@ -259,7 +289,7 @@ export default async function handler(
       };
     });
 
-    // Add no-cache headers to prevent 304 responses
+    // Add no-cache headers
     console.log('[TRENDS API] === Setting response headers ===');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -272,7 +302,7 @@ export default async function handler(
       visitContext: visitTimeline,
       totalVisits: visitTimeline.length,
       debug: {
-        testResultsCount: testResults?.length || 0,
+        testResultsCount: Object.values(allTestResultsByReport).flat().length,
         labReportsCount: labReports?.length || 0,
         processedTestTypes: Object.keys(processedTrendData),
         timestamp: new Date().toISOString(),
@@ -290,27 +320,9 @@ export default async function handler(
     res.status(200).json(responseData);
   } catch (error) {
     console.error('[TRENDS API] ❌ CRITICAL ERROR:', error);
-    console.error(
-      '[TRENDS API] Error name:',
-      error instanceof Error ? error.name : 'Unknown'
-    );
-    console.error(
-      '[TRENDS API] Error message:',
-      error instanceof Error ? error.message : 'Unknown error'
-    );
-    console.error(
-      '[TRENDS API] Error stack:',
-      error instanceof Error ? error.stack : 'No stack trace'
-    );
-
-    if (error instanceof Error && error.message) {
-      console.error('[TRENDS API] Error details:', error.message);
-    }
-
     res.status(500).json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
       timestamp: new Date().toISOString(),
     });
   }

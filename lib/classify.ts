@@ -1,4 +1,4 @@
-// lib/classify.ts
+// lib/classify.ts - UPDATED VERSION
 
 export interface TestValues {
   PTH: number;           // Current iPTH (C-PTH)
@@ -80,42 +80,70 @@ function classifyBucketGroup2(cpth: number, ppth?: number): 1 | 2 | 3 {
 
 /* ------------------------------
    DETERMINE SITUATION (T1-T33)
+   UPDATED: Different logic for Bucket 2
 -------------------------------- */
 function determineSituation(group: 1 | 2, bucket: 1 | 2 | 3, CaCorrected: number, Phos: number): string {
-  // Helper to decide index offset based on CaCorrected & Phos
-  const caCategory = getCaCategory(CaCorrected);
-  const pCategory = getPCategory(Phos);
+  // UPDATED: Use different category functions based on bucket
+  let caCategory: number;
+  let pCategory: number;
+  
+  if (bucket === 2) {
+    // Bucket 2 has different CaCorrected categories for both Group 1 and Group 2
+    caCategory = getCaCategoryBucket2(CaCorrected);
+    pCategory = getPCategoryBucket2(Phos);
+  } else {
+    // Bucket 1 and Bucket 3 use standard categories
+    caCategory = getCaCategoryStandard(CaCorrected);
+    pCategory = getPCategoryStandard(Phos);
+  }
 
   // Map CaCorrected/P combination to 1-based index inside the bucket
-  // There are 12 situations in each bucket:
-  // CaCorrected: >10.2 | 8.4-10.2 | 7.5-8.4 | <7.5
-  // P: >5.5 | 3.5-5.5 | <3.5
-  const caIndex = caCategory; // 0..3
-  const pIndex = pCategory;   // 0..2
+  const caIndex = caCategory; // 0..2 for bucket 2, 0..3 for bucket 1&3
+  const pIndex = pCategory;   // 0..2 for all buckets
 
-  const situationIndex = caIndex * 3 + pIndex + 1; // 1..12
+  let situationIndex: number;
+  let base: number;
 
-  // Each bucket has 12 situations:
-  // Bucket 1: T1-T12
-  // Bucket 2: T13-T21
-  // Bucket 3: T22-T33
-  const base = (bucket === 1) ? 0 : (bucket === 2 ? 12 : 21);
+  if (bucket === 2) {
+    // Bucket 2: Has only 9 situations (T13-T21) with 3x3 matrix
+    situationIndex = caIndex * 3 + pIndex + 1; // 1..9
+    base = 12; // T13-T21
+  } else {
+    // Bucket 1 & 3: Have 12 situations each with 4x3 matrix
+    situationIndex = caIndex * 3 + pIndex + 1; // 1..12
+    base = (bucket === 1) ? 0 : 21; // Bucket 1: T1-T12, Bucket 3: T22-T33
+  }
 
-  return `T${base + situationIndex}`; // e.g., T5
+  return `T${base + situationIndex}`;
 }
 
 /* ------------------------------
-   HELPERS: CaCorrected & P categories
+   STANDARD CATEGORIES (for Bucket 1 & 3)
 -------------------------------- */
-function getCaCategory(CaCorrected: number): 0 | 1 | 2 | 3 {
-  if (CaCorrected > 10.2) return 0;
-  if (CaCorrected >= 8.4) return 1;
-  if (CaCorrected >= 7.5) return 2;
-  return 3; // <7.5
+function getCaCategoryStandard(CaCorrected: number): 0 | 1 | 2 | 3 {
+  if (CaCorrected > 10.2) return 0;    // Ca > 10.2
+  if (CaCorrected >= 8.4) return 1;    // Ca 8.4-10.2
+  if (CaCorrected >= 7.5) return 2;    // Ca 7.5-8.4
+  return 3;                            // Ca < 7.5
 }
 
-function getPCategory(P: number): 0 | 1 | 2 {
-  if (P > 5.5) return 0;
-  if (P >= 3.5) return 1;
-  return 2; // <3.5
+function getPCategoryStandard(P: number): 0 | 1 | 2 {
+  if (P > 5.5) return 0;       // P > 5.5
+  if (P >= 3.5) return 1;      // P 3.5-5.5
+  return 2;                    // P < 3.5
+}
+
+/* ------------------------------
+   BUCKET 2 CATEGORIES (different CaCorrected ranges)
+-------------------------------- */
+function getCaCategoryBucket2(CaCorrected: number): 0 | 1 | 2 {
+  if (CaCorrected > 10.2) return 0;    // Ca > 10.2
+  if (CaCorrected >= 7.5) return 1;    // Ca 7.5-10.2 (MERGED RANGE!)
+  return 2;                            // Ca < 7.5
+}
+
+function getPCategoryBucket2(P: number): 0 | 1 | 2 {
+  if (P > 5.5) return 0;       // P > 5.5
+  if (P >= 3.5) return 1;      // P 3.5-5.5
+  return 2;                    // P < 3.5
 }

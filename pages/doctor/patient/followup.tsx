@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, User, TestTube, FileText, CheckCircle, AlertTriangle, Clock, Calendar, TrendingUp } from "lucide-react";
+import { Menu, User, TestTube, FileText, CheckCircle, AlertTriangle, Clock, Calendar, TrendingUp, Pill, BarChart3, Activity } from "lucide-react";
 import TrendGraph from "../../../components/doctor/TrendGraph";
 import DoctorSidebar from "../../../components/doctor/DoctorSidebar";
 import PatientSearch from "../../../components/doctor/PatientSearch";
@@ -49,10 +49,9 @@ type TestResult = {
   };
 };
 
-export default function FollowUpVisits({user}: {user:any}) {
+export default function FollowUpVisits({ user }: { user: any }) {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState<"search" | "tests" | "recommendations" | "complete">("search");
-  const [showSearch, setShowSearch] = useState(true);
   
   // Patient data
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -94,7 +93,6 @@ export default function FollowUpVisits({user}: {user:any}) {
   const handlePatientFound = (patient: Patient) => {
     setSelectedPatient(patient);
     setCurrentStep("tests");
-    setShowSearch(false);
     
     // Fetch test validity data
     fetchTestValidity(patient.id);
@@ -105,14 +103,10 @@ export default function FollowUpVisits({user}: {user:any}) {
     setTestValues((prev) => ({ ...prev, [name]: value }));
   };
 
-
-
-  // Update the handleSubmitTests function to ensure proper data flow:
-
   const handleSubmitTests = async () => {
     if (!selectedPatient) return;
     
-    // Validate required fields - check for null/undefined/empty string, not falsy values
+    // Validate required fields
     const requiredFields = [
       { field: "PTH", value: testValues.PTH },
       { field: "Ca", value: testValues.Ca },
@@ -159,7 +153,6 @@ export default function FollowUpVisits({user}: {user:any}) {
         labReportId: data.labReportId,
       });
 
-      // Add a small delay to ensure database is updated before moving to next step
       setTimeout(() => {
         setCurrentStep("recommendations");
         setSuccess("Test results submitted successfully!");
@@ -172,46 +165,9 @@ export default function FollowUpVisits({user}: {user:any}) {
     }
   };
 
-  // Add state for forcing TrendGraph refresh
-  const [trendGraphKey, setTrendGraphKey] = useState(0);
-
-  // Update the recommendations section to force refresh TrendGraph:
-  {/* Enhanced Trend Analysis with Validity Information */}
-  {selectedPatient && (
-    <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-blue-800 flex items-center">
-          <TrendingUp className="w-5 h-5 mr-2" />
-          Lab Test Trends & History
-        </h3>
-        <div className="text-sm text-gray-600">
-          Follow-up Visit Analysis
-        </div>
-      </div>
-      
-      {/* Force re-render with key and add loading state */}
-      <TrendGraph 
-        key={`trend-${selectedPatient.id}-${trendGraphKey}-${classificationResult?.labReportId}`}
-        patientId={selectedPatient.id} 
-        patientName={selectedPatient.name}
-        showTitle={false}
-        height={400}
-      />
-      
-      <div className="mt-4 bg-blue-50 rounded-lg p-3">
-        <p className="text-sm font-medium text-gray-800">
-          <strong className="text-blue-900">💡 Analysis Note:</strong> This trend analysis shows how test values have changed over time, 
-          including carried-forward values when tests weren't repeated. Fresh tests are highlighted with larger, 
-          solid points, while carried-forward values are shown with reduced opacity.
-        </p>
-      </div>
-    </div>
-  )}
-
   const handleRecommendationsSaved = (recommendations: any[]) => {
     setSavedRecommendations(recommendations);
     setSuccess("Recommendations saved successfully! You can now proceed to medications or complete the visit.");
-    // Don't automatically complete the visit here - let the user choose when to complete
   };
 
   const handleMedicationsSaved = () => {
@@ -223,13 +179,11 @@ export default function FollowUpVisits({user}: {user:any}) {
     const hasRecommendations = savedRecommendations.length > 0;
     const hasMedications = medicationsSaved;
 
-    // If both are saved or user wants to proceed anyway, complete the visit
     if (hasRecommendations && hasMedications) {
       fetchMedicationsForReport();
       return;
     }
 
-    // Show confirmation dialog if something is missing
     setShowConfirmDialog(true);
   };
 
@@ -298,7 +252,6 @@ export default function FollowUpVisits({user}: {user:any}) {
         const newTestValues = { ...testValues };
         Object.entries(data.testValidityData).forEach(([testCode, validity]: [string, any]) => {
           if (validity.lastResult && validity.validityStatus.isValid) {
-            // Map test codes to form field names
             const fieldMapping: Record<string, keyof typeof testValues> = {
               'PTH': 'PTH',
               'Ca': 'Ca',
@@ -327,18 +280,16 @@ export default function FollowUpVisits({user}: {user:any}) {
     }
   };
 
-  // Function to calculate corrected calcium
   const calculateCorrectedCalcium = (calcium: number, albumin: number) => {
     const correctedCa = calcium + 0.8 * (4 - albumin);
     return correctedCa.toFixed(2);
   };
 
-
   const renderStepIndicator = () => {
     const steps = [
-      { key: "search", label: "Search Patient", icon: User },
+      { key: "search", label: "Patient Selection", icon: User },
       { key: "tests", label: "Test Results", icon: TestTube },
-      { key: "recommendations", label: "Recommendations", icon: FileText },
+      { key: "recommendations", label: "Analysis & Treatment", icon: BarChart3 },
       { key: "complete", label: "Complete", icon: CheckCircle },
     ];
 
@@ -428,7 +379,7 @@ export default function FollowUpVisits({user}: {user:any}) {
       {/* Sidebar */}
       <DoctorSidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Main Content */}
+      {/* Main Content - Fixed layout like register.tsx */}
       <main className="flex-1 p-10 lg:ml-64 transition-all">
         <button
           className="lg:hidden mb-4 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -479,6 +430,26 @@ export default function FollowUpVisits({user}: {user:any}) {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="space-y-6"
           >
+            {/* Patient Summary */}
+            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
+              <h3 className="text-lg font-semibold text-blue-800 mb-4">Follow-up Visit</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Name:</p>
+                  <p className="font-medium text-gray-900">{selectedPatient.name}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Age:</p>
+                  <p className="font-medium text-gray-900">{selectedPatient.age} years</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Patient ID:</p>
+                  <p className="font-medium text-gray-900 text-xs">{selectedPatient.id}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Test Input */}
             <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-blue-800">
@@ -595,7 +566,7 @@ export default function FollowUpVisits({user}: {user:any}) {
                   />
                 </div>
 
-                {/* Corrected Calcium - Make it readonly and show calculated value */}
+                {/* Corrected Calcium */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-sm font-medium text-gray-700">
@@ -668,9 +639,9 @@ export default function FollowUpVisits({user}: {user:any}) {
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-400"
                     placeholder="Enter LA Rad value"
                   />
-              </div>
+                </div>
 
-                {/* Notes Section - if you have one */}
+                {/* Notes Section */}
                 <div className="col-span-full space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
                     Additional Notes (Optional)
@@ -702,27 +673,27 @@ export default function FollowUpVisits({user}: {user:any}) {
                   </div>
                 </div>
               )}
-            </div>
 
-            <div className="flex justify-center space-x-4">
-              <Button
-                onClick={() => setCurrentStep("search")}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-8"
-              >
-                Back to Patient Selection
-              </Button>
-              <Button
-                onClick={handleSubmitTests}
-                disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-              >
-                {loading ? "Processing..." : "Classify & Get Recommendations"}
-              </Button>
+              <div className="flex justify-between mt-8">
+                <Button
+                  onClick={() => setCurrentStep("search")}
+                  className="px-6 border border-gray-300 bg-white text-gray-800 hover:bg-gray-100"
+                >
+                  Back to Patient Selection
+                </Button>
+                <Button
+                  onClick={handleSubmitTests}
+                  disabled={loading}
+                  className="bg-rose-600 hover:bg-rose-700 text-white px-8"
+                >
+                  {loading ? "Processing..." : "Classify & Get Recommendations"}
+                </Button>
+              </div>
             </div>
           </motion.div>
         )}
 
-        {/* Step 3: Recommendations */}
+        {/* Step 3: Analysis & Treatment (NEW ORDER: Trends → Recommendations → Medications) */}
         {currentStep === "recommendations" && classificationResult && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -732,7 +703,7 @@ export default function FollowUpVisits({user}: {user:any}) {
           >
             {/* Patient Summary */}
             <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-blue-800 mb-4">New Patient Registered</h3>
+              <h3 className="text-lg font-semibold text-blue-800 mb-4">Follow-up Visit Results</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div>
                   <p className="text-gray-600">Name:</p>
@@ -751,7 +722,7 @@ export default function FollowUpVisits({user}: {user:any}) {
 
             {/* Classification Result */}
             <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-blue-800 mb-4">Classification Result</h3>
+              <h3 className="text-lg font-semibold text-blue-800 mb-4">Current Classification</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <p className="text-gray-600">Group</p>
@@ -768,45 +739,69 @@ export default function FollowUpVisits({user}: {user:any}) {
               </div>
             </div>
 
-            {/* Recommendations Table */}
-
-            {/* Recommendations Table */}
-            <RecommendationTable
-              situationId={classificationResult.situationId}
-              labReportId={classificationResult.labReportId}
-              onRecommendationsSaved={handleRecommendationsSaved}
-            />
-
-            {/* Medication Recommendation */}
-            <MedicationRecommendation
-              labReportId={classificationResult.labReportId}
-              testValues={testValues}
-              classification={classificationResult}
-              onSaved={handleMedicationsSaved}
-            />
-
-            {/* Enhanced Trend Analysis with Validity Information */}
+            {/* 1. TRENDS/GRAPHS FIRST - Most Important for Decision Making */}
             {selectedPatient && (
               <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-                <div className="flex items-center justify-between mb-4">
-                  {/* ...existing code... */}
-                </div>
-                {/* Show message about latest data */}
-                <div className="mb-4 bg-blue-50 rounded-lg p-3">
-                  {/* ...existing code... */}
-                </div>
-                {/* TrendGraph with full functionality */}
                 <TrendGraph 
                   key={`trend-followup-${selectedPatient.id}-${classificationResult?.labReportId || Date.now()}`}
                   patientId={selectedPatient.id} 
                   patientName={selectedPatient.name}
-                  showTitle={true}
-                  height={500}
+                  showTitle={true}  // This enables all the built-in buttons and functionality
+                  height={400}
                 />
               </div>
             )}
 
-            <div className="flex justify-center">
+            {/* 2. TREATMENT RECOMMENDATIONS SECOND - Based on Trends Analysis */}
+            <div className="bg-white/80 rounded-xl shadow p-6 border border-green-100">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-green-800 flex items-center">
+                  <FileText className="w-6 h-6 mr-2 text-green-600" />
+                  Treatment Recommendations
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Evidence-based recommendations based on current classification and trends
+                </p>
+              </div>
+              <div className="p-6">
+                <RecommendationTable
+                  situationId={classificationResult.situationId}
+                  labReportId={classificationResult.labReportId}
+                  onRecommendationsSaved={handleRecommendationsSaved}
+                />
+              </div>
+            </div>
+
+            {/* 3. MEDICATION RECOMMENDATIONS LAST - Final Treatment Step */}
+            <div className="bg-white/80 rounded-xl shadow p-6 border border-purple-100">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-purple-800 flex items-center">
+                  <Pill className="w-6 h-6 mr-2 text-purple-600" />
+                  Medication Prescriptions
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Prescribe medications based on trends analysis and treatment recommendations
+                </p>
+              </div>
+              <div className="p-6">
+                <MedicationRecommendation
+                  labReportId={classificationResult.labReportId}
+                  testValues={testValues}
+                  classification={classificationResult}
+                  onSaved={handleMedicationsSaved}
+                />
+              </div>
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="flex justify-between items-center pt-6 border-t border-gray-200">
+              <Button
+                onClick={() => setCurrentStep("tests")}
+                className="bg-gray-600 hover:bg-gray-700 text-white"
+              >
+                ← Back to Test Results
+              </Button>
+              
               <Button
                 onClick={handleCompleteVisit}
                 className="bg-green-600 hover:bg-green-700 text-white px-8"
@@ -817,29 +812,22 @@ export default function FollowUpVisits({user}: {user:any}) {
           </motion.div>
         )}
 
-        
         {/* Step 4: Complete */}
         {currentStep === "complete" && selectedPatient && classificationResult && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="space-y-6"
+            className="text-center space-y-6"
           >
-            <div className="text-center">
-              <div className="bg-white/80 rounded-xl shadow p-8 border border-green-200 mb-6">
-                <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-green-800 mb-4">Follow-up Visit Completed!</h3>
-                <p className="text-gray-700 mb-6">
-                  The follow-up visit for {selectedPatient?.name} has been successfully recorded with new test results and recommendations.
-                </p>
-                <Button
-                  onClick={handleStartNewVisit}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-                >
-                  Start New Follow-up Visit
-                </Button>
-              </div>
+            <div className="bg-green-50 border border-green-200 rounded-xl p-8">
+              <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-green-800 mb-2">
+                Follow-up Visit Completed!
+              </h2>
+              <p className="text-green-700">
+                The follow-up visit for {selectedPatient?.name} has been successfully recorded with new test results and recommendations.
+              </p>
             </div>
 
             {/* Patient Report */}
@@ -860,6 +848,22 @@ export default function FollowUpVisits({user}: {user:any}) {
               visitDate={new Date().toLocaleDateString()}
               notes={notes}
             />
+
+            {/* Action buttons */}
+            <div className="flex justify-center space-x-4">
+              <Button
+                onClick={handleStartNewVisit}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+              >
+                Start New Follow-up Visit
+              </Button>
+              <Button
+                onClick={() => window.location.href = '/doctor/dashboard'}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-8"
+              >
+                Go to Dashboard
+              </Button>
+            </div>
           </motion.div>
         )}
       </main>

@@ -114,7 +114,7 @@ export default function PatientSearch({
           <Button
             onClick={handleSearch}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+            className="bg-blue-600 hover:bg-blue-700 text-white !px-8 !py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200"
           >
             {loading ? "Searching..." : "Search"}
           </Button>
@@ -136,7 +136,7 @@ export default function PatientSearch({
             </h4>
             <Button
               onClick={handleSelectPatient}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-green-600 hover:bg-green-700 text-white !px-8 !py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200"
             >
               Select Patient
             </Button>
