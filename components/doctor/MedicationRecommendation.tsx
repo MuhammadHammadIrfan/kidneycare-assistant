@@ -422,48 +422,6 @@ const MedicationRecommendation: React.FC<MedicationRecommendationProps> = ({
               </div>
             )}
           </div>
-          
-          {/* Previous Medications Comparison - MOBILE RESPONSIVE */}
-          {previousMedications.length > 0 && (
-            <div className="bg-blue-50 rounded-lg p-3 lg:p-4 border border-blue-200">
-              <h4 className="text-sm lg:text-base font-medium text-blue-800 mb-3 flex items-center">
-                <History className="w-4 h-4 mr-1" />
-                Previous Medications (Last Visit)
-              </h4>
-              <div className="space-y-2">
-                {previousMedications.filter(pm => pm.dosage > 0).map(prevMed => {
-                  const currentMed = medications.find(m => m.id === prevMed.medicationtypeid);
-                  const currentDosage = currentMed?.dosage || 0;
-                  const previousDosage = prevMed.dosage;
-                  const hasChanged = currentDosage !== previousDosage;
-                  
-                  return (
-                    <div key={prevMed.id} className="bg-white p-2 lg:p-3 rounded border border-blue-100">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
-                        <span className="text-gray-800 font-medium text-xs lg:text-sm">
-                          {prevMed.MedicationType.name}
-                        </span>
-                        <div className="flex items-center space-x-2 text-xs lg:text-sm">
-                          <span className="text-gray-600">
-                            Was: {previousDosage} {prevMed.MedicationType.unit}
-                          </span>
-                          <span className="text-gray-400">→</span>
-                          <span className={`font-medium ${hasChanged ? 'text-blue-700' : 'text-gray-600'}`}>
-                            Now: {currentDosage} {prevMed.MedicationType.unit}
-                          </span>
-                          {hasChanged && (
-                            <span className="text-xs text-blue-600 font-medium bg-blue-100 px-1 rounded">
-                              Modified
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Save Button and Status - MOBILE RESPONSIVE */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mt-4 lg:mt-6 pt-4 border-t border-gray-200">

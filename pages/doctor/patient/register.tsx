@@ -330,6 +330,31 @@ export default function RegisterPatient({ user }: { user: any }) {
     );
   };
 
+  // Add these helper functions before the component return statement (after the state declarations)
+  const getVascularClassification = (group: number) => {
+    switch (group) {
+      case 1:
+        return { status: 'Positive (+ve)', color: 'red', description: 'Vascular calcification present' };
+      case 2:
+        return { status: 'Negative (-ve)', color: 'green', description: 'No vascular calcification' };
+      default:
+        return { status: 'Unknown', color: 'gray', description: 'Classification pending' };
+    }
+  };
+
+  const getPTHRange = (bucket: number) => {
+    switch (bucket) {
+      case 1:
+        return { status: 'Low Turnover', color: 'blue', description: 'PTH below target range' };
+      case 2:
+        return { status: 'Within Range', color: 'green', description: 'PTH within target range' };
+      case 3:
+        return { status: 'High Turnover', color: 'red', description: 'PTH above target range' };
+      default:
+        return { status: 'Unknown', color: 'gray', description: 'Range assessment pending' };
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-rose-100">
       {/* Sidebar */}
@@ -487,9 +512,11 @@ export default function RegisterPatient({ user }: { user: any }) {
                     <p className="text-gray-600 text-xs lg:text-sm">Bucket</p>
                     <p className="text-xl lg:text-2xl font-bold text-green-900">{classificationResult.bucket}</p>
                   </div>
-                  <div className="text-center p-3 lg:p-4 bg-rose-50 rounded-lg">
-                    <p className="text-gray-600 text-xs lg:text-sm">Situation</p>
-                    <p className="text-lg lg:text-2xl font-bold text-rose-900 break-words">{classificationResult.situation}</p>
+                  <div className="text-center p-3 lg:p-4 bg-purple-50 rounded-lg">
+                    <p className="text-gray-600 text-xs lg:text-sm">Risk Category</p>
+                    <p className="text-lg lg:text-2xl font-bold text-purple-900 break-words">
+                      {classificationResult.situation.replace(/^\w+\s*-?\s*/, '')}
+                    </p>
                   </div>
                 </div>
               </div>

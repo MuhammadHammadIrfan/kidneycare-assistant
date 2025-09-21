@@ -420,6 +420,31 @@ export default function FollowUpVisits({ user }: { user: any }) {
     return null;
   };
 
+  // Add these helper functions before the component return statement
+  const getVascularClassification = (group: number) => {
+    switch (group) {
+      case 1:
+        return { status: 'Positive (+ve)', color: 'red', description: 'Vascular calcification present' };
+      case 2:
+        return { status: 'Negative (-ve)', color: 'green', description: 'No vascular calcification' };
+      default:
+        return { status: 'Unknown', color: 'gray', description: 'Classification pending' };
+    }
+  };
+
+  const getPTHRange = (bucket: number) => {
+    switch (bucket) {
+      case 1:
+        return { status: 'Low Turnover', color: 'blue', description: 'PTH below target range' };
+      case 2:
+        return { status: 'Within Range', color: 'green', description: 'PTH within target range' };
+      case 3:
+        return { status: 'High Turnover', color: 'red', description: 'PTH above target range' };
+      default:
+        return { status: 'Unknown', color: 'gray', description: 'Range assessment pending' };
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-rose-100">
       {/* Sidebar - FIXED: Add sidebar like register.tsx */}
@@ -774,21 +799,80 @@ export default function FollowUpVisits({ user }: { user: any }) {
                 </div>
               </div>
 
-              {/* Classification Result - MOBILE RESPONSIVE */}
+              {/* Classification Result - ENHANCED WITH VASCULAR & PTH ANALYSIS */}
               <div className="bg-white/90 rounded-xl shadow-lg p-4 lg:p-6 border border-blue-100">
-                <h3 className="text-base lg:text-lg font-semibold text-blue-800 mb-4">Current Classification</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
-                  <div className="text-center p-3 lg:p-4 bg-blue-50 rounded-lg">
-                    <p className="text-gray-600 text-xs lg:text-sm">Group</p>
-                    <p className="text-xl lg:text-2xl font-bold text-blue-900">{classificationResult.group}</p>
+                <h3 className="text-base lg:text-lg font-semibold text-blue-800 mb-4">Current Classification & Analysis</h3>
+                
+                {/* Enhanced Analysis Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                  {/* Vascular Classification */}
+                  <div className={`p-4 rounded-lg border-2 ${
+                    getVascularClassification(classificationResult.group).color === 'green' 
+                      ? 'bg-green-50 border-green-200' 
+                      : getVascularClassification(classificationResult.group).color === 'red'
+                        ? 'bg-red-50 border-red-200'
+                        : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="flex items-center mb-2">
+                      <div className={`w-3 h-3 rounded-full mr-2 ${
+                        getVascularClassification(classificationResult.group).color === 'green' 
+                          ? 'bg-green-500' 
+                          : getVascularClassification(classificationResult.group).color === 'red'
+                            ? 'bg-red-500'
+                            : 'bg-gray-500'
+                      }`}></div>
+                      <h4 className="font-semibold text-gray-800 text-sm lg:text-base">Vascular Classification</h4>
+                    </div>
+                    <p className={`font-bold text-lg ${
+                      getVascularClassification(classificationResult.group).color === 'green' 
+                        ? 'text-green-800' 
+                        : getVascularClassification(classificationResult.group).color === 'red'
+                          ? 'text-red-800'
+                          : 'text-gray-800'
+                    }`}>
+                      {getVascularClassification(classificationResult.group).status}
+                    </p>
+                    <p className="text-xs lg:text-sm text-gray-600 mt-1">
+                      {getVascularClassification(classificationResult.group).description}
+                    </p>
                   </div>
-                  <div className="text-center p-3 lg:p-4 bg-green-50 rounded-lg">
-                    <p className="text-gray-600 text-xs lg:text-sm">Bucket</p>
-                    <p className="text-xl lg:text-2xl font-bold text-green-900">{classificationResult.bucket}</p>
-                  </div>
-                  <div className="text-center p-3 lg:p-4 bg-rose-50 rounded-lg sm:col-span-3 lg:col-span-1">
-                    <p className="text-gray-600 text-xs lg:text-sm">Situation</p>
-                    <p className="text-lg lg:text-2xl font-bold text-rose-900 break-words">{classificationResult.situation}</p>
+
+                  {/* PTH Range Analysis */}
+                  <div className={`p-4 rounded-lg border-2 ${
+                    getPTHRange(classificationResult.bucket).color === 'green' 
+                      ? 'bg-green-50 border-green-200' 
+                      : getPTHRange(classificationResult.bucket).color === 'blue'
+                        ? 'bg-blue-50 border-blue-200'
+                        : getPTHRange(classificationResult.bucket).color === 'red'
+                          ? 'bg-red-50 border-red-200'
+                          : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="flex items-center mb-2">
+                      <div className={`w-3 h-3 rounded-full mr-2 ${
+                        getPTHRange(classificationResult.bucket).color === 'green' 
+                          ? 'bg-green-500' 
+                          : getPTHRange(classificationResult.bucket).color === 'blue'
+                            ? 'bg-blue-500'
+                            : getPTHRange(classificationResult.bucket).color === 'red'
+                              ? 'bg-red-500'
+                              : 'bg-gray-500'
+                      }`}></div>
+                      <h4 className="font-semibold text-gray-800 text-sm lg:text-base">PTH Range Analysis</h4>
+                    </div>
+                    <p className={`font-bold text-lg ${
+                      getPTHRange(classificationResult.bucket).color === 'green' 
+                        ? 'text-green-800' 
+                        : getPTHRange(classificationResult.bucket).color === 'blue'
+                          ? 'text-blue-800'
+                          : getPTHRange(classificationResult.bucket).color === 'red'
+                            ? 'text-red-800'
+                            : 'text-gray-800'
+                    }`}>
+                      {getPTHRange(classificationResult.bucket).status}
+                    </p>
+                    <p className="text-xs lg:text-sm text-gray-600 mt-1">
+                      {getPTHRange(classificationResult.bucket).description}
+                    </p>
                   </div>
                 </div>
               </div>
