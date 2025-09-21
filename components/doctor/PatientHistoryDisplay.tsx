@@ -268,7 +268,7 @@ export default function PatientHistoryDisplay({
                   )}
                 </div>
                 
-                {/* Classification badges - CLINICAL INTERPRETATION */}
+                {/* Classification badges - CLINICAL INTERPRETATION - FIXED PTH MAPPING */}
                 {visitHistory.situation && (
                   <div className="flex flex-wrap items-center gap-1 lg:gap-2">
                     <span className="text-xs text-gray-600 hidden lg:inline">Classification:</span>
@@ -282,11 +282,15 @@ export default function PatientHistoryDisplay({
                       {visitHistory.situation.groupid === 1 ? 'Vascular (+ve)' : 'Vascular (-ve)'}
                     </span>
                     
-                    {/* PTH Range based on bucketid */}
+                    {/* PTH Range based on bucketid - FIXED MAPPING */}
                     <span className={`inline-flex items-center px-1.5 lg:px-2 py-0.5 lg:py-1 rounded-full text-xs font-medium ${
-                      visitHistory.situation.bucketid === 1 || visitHistory.situation.bucketid === 3
-                        ? 'bg-orange-100/80 text-orange-800' 
-                        : 'bg-blue-100/80 text-blue-800'
+                      visitHistory.situation.bucketid === 1 
+                        ? 'bg-blue-100/80 text-blue-800'     // Bucket 1 = Low Turnover (Blue)
+                        : visitHistory.situation.bucketid === 2 
+                          ? 'bg-green-100/80 text-green-800' // Bucket 2 = Within Range (Green)
+                          : visitHistory.situation.bucketid === 3
+                            ? 'bg-red-100/80 text-red-800'   // Bucket 3 = High Turnover (Red)
+                            : 'bg-gray-100/80 text-gray-800' // Unknown
                     }`}>
                       PTH: {
                         visitHistory.situation.bucketid === 1 ? 'High-turnover' :
@@ -551,32 +555,165 @@ export default function PatientHistoryDisplay({
             </div>
           )}
 
-          {/* Classification Details - MOBILE RESPONSIVE */}
+          {/* Classification badges - CLINICAL INTERPRETATION - FIXED PTH MAPPING */}
+          {visitHistory.situation && (
+            <div className="flex flex-wrap items-center gap-1 lg:gap-2">
+              <span className="text-xs text-gray-600 hidden lg:inline">Classification:</span>
+              
+              {/* Vascular Classification based on groupid */}
+              <span className={`inline-flex items-center px-1.5 lg:px-2 py-0.5 lg:py-1 rounded-full text-xs font-medium ${
+                visitHistory.situation.groupid === 1 
+                  ? 'bg-red-100/80 text-red-800' 
+                  : 'bg-green-100/80 text-green-800'
+              }`}>
+                {visitHistory.situation.groupid === 1 ? 'Vascular (+ve)' : 'Vascular (-ve)'}
+              </span>
+              
+              {/* PTH Range based on bucketid - FIXED MAPPING */}
+              <span className={`inline-flex items-center px-1.5 lg:px-2 py-0.5 lg:py-1 rounded-full text-xs font-medium ${
+                visitHistory.situation.bucketid === 1 
+                  ? 'bg-blue-100/80 text-blue-800'     // Bucket 1 = Low Turnover (Blue)
+                  : visitHistory.situation.bucketid === 2 
+                    ? 'bg-green-100/80 text-green-800' // Bucket 2 = Within Range (Green)
+                    : visitHistory.situation.bucketid === 3
+                      ? 'bg-red-100/80 text-red-800'   // Bucket 3 = High Turnover (Red)
+                      : 'bg-gray-100/80 text-gray-800' // Unknown
+              }`}>
+                PTH: {
+                  visitHistory.situation.bucketid === 1 ? 'High-turnover' :
+                  visitHistory.situation.bucketid === 2 ? 'Within-range' :
+                  visitHistory.situation.bucketid === 3 ? 'Low-turnover' :
+                  'Unknown'
+                }
+              </span>
+            </div>
+          )}
+
+          {/* Classification Details - ENHANCED WITH VASCULAR & PTH ANALYSIS */}
           {visitHistory.situation && (
             <div>
               <h4 className="text-base lg:text-lg font-semibold text-gray-900 mb-2 lg:mb-3 flex items-center">
                 <Activity className="w-4 h-4 lg:w-5 lg:h-5 mr-1 lg:mr-2 text-purple-600 flex-shrink-0" />
-                <span className="hidden sm:inline">Clinical Classification</span>
+                <span className="hidden sm:inline">Clinical Classification & Analysis</span>
                 <span className="sm:hidden">Classification</span>
               </h4>
-              <div className="bg-gradient-to-r from-purple-50/90 to-indigo-50/90 backdrop-blur-sm rounded-lg p-3 lg:p-4 border border-purple-200">
-                <div className="grid grid-cols-3 gap-2 lg:gap-4">
-                  <div className="text-center">
-                    <p className="text-xs lg:text-sm font-medium text-gray-600">Group</p>
-                    <p className="text-lg lg:text-2xl font-bold text-blue-600">{visitHistory.situation.groupid}</p>
+              
+              <div className="space-y-3 lg:space-y-4">
+                {/* Main Classification Grid */}
+                <div className="bg-gradient-to-r from-purple-50/90 to-indigo-50/90 backdrop-blur-sm rounded-lg p-3 lg:p-4 border border-purple-200">
+                  <div className="grid grid-cols-3 gap-2 lg:gap-4">
+                    <div className="text-center">
+                      <p className="text-xs lg:text-sm font-medium text-gray-600">Group</p>
+                      <p className="text-lg lg:text-2xl font-bold text-blue-600">{visitHistory.situation.groupid}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs lg:text-sm font-medium text-gray-600">Bucket</p>
+                      <p className="text-lg lg:text-2xl font-bold text-green-600">{visitHistory.situation.bucketid}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs lg:text-sm font-medium text-gray-600">Situation</p>
+                      <p className="text-lg lg:text-2xl font-bold text-amber-600">{visitHistory.situation.code}</p>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs lg:text-sm font-medium text-gray-600">Bucket</p>
-                    <p className="text-lg lg:text-2xl font-bold text-green-600">{visitHistory.situation.bucketid}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs lg:text-sm font-medium text-gray-600">Situation</p>
-                    <p className="text-lg lg:text-2xl font-bold text-amber-600">{visitHistory.situation.code}</p>
+                  <div className="mt-2 lg:mt-4">
+                    <p className="text-xs lg:text-sm text-gray-700 leading-tight">
+                      <span className="font-medium">Description:</span> {visitHistory.situation.description}
+                    </p>
                   </div>
                 </div>
-                <div className="mt-2 lg:mt-4">
-                  <p className="text-xs lg:text-sm text-gray-700 leading-tight">
-                    <span className="font-medium">Description:</span> {visitHistory.situation.description}
+
+                {/* Enhanced Clinical Analysis Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
+                  {/* Vascular Classification Analysis */}
+                  <div className={`p-3 lg:p-4 rounded-lg border-2 ${
+                    visitHistory.situation.groupid === 1 
+                      ? 'bg-red-50 border-red-200' 
+                      : 'bg-green-50 border-green-200'
+                  }`}>
+                    <div className="flex items-center mb-2">
+                      <div className={`w-3 h-3 rounded-full mr-2 ${
+                        visitHistory.situation.groupid === 1 ? 'bg-red-500' : 'bg-green-500'
+                      }`}></div>
+                      <h5 className="font-semibold text-gray-800 text-sm lg:text-base">Vascular Classification</h5>
+                    </div>
+                    <p className={`font-bold text-lg ${
+                      visitHistory.situation.groupid === 1 ? 'text-red-800' : 'text-green-800'
+                    }`}>
+                      {visitHistory.situation.groupid === 1 ? 'Positive (+ve)' : 'Negative (-ve)'}
+                    </p>
+                    <p className="text-xs lg:text-sm text-gray-600 mt-1">
+                      {visitHistory.situation.groupid === 1 
+                        ? 'Vascular calcification present' 
+                        : 'No vascular calcification detected'
+                      }
+                    </p>
+                  </div>
+
+                  {/* PTH Range Analysis */}
+                  <div className={`p-3 lg:p-4 rounded-lg border-2 ${
+                    visitHistory.situation.bucketid === 1 
+                      ? 'bg-blue-50 border-blue-200'     // Low Turnover
+                      : visitHistory.situation.bucketid === 2 
+                        ? 'bg-green-50 border-green-200' // Within Range
+                        : visitHistory.situation.bucketid === 3
+                          ? 'bg-red-50 border-red-200'   // High Turnover
+                          : 'bg-gray-50 border-gray-200' // Unknown
+                  }`}>
+                    <div className="flex items-center mb-2">
+                      <div className={`w-3 h-3 rounded-full mr-2 ${
+                        visitHistory.situation.bucketid === 1 
+                          ? 'bg-blue-500'     // Low Turnover
+                          : visitHistory.situation.bucketid === 2 
+                            ? 'bg-green-500' // Within Range
+                            : visitHistory.situation.bucketid === 3
+                              ? 'bg-red-500'   // High Turnover
+                              : 'bg-gray-500' // Unknown
+                      }`}></div>
+                      <h5 className="font-semibold text-gray-800 text-sm lg:text-base">PTH Range Analysis</h5>
+                    </div>
+                    <p className={`font-bold text-lg ${
+                      visitHistory.situation.bucketid === 1 
+                        ? 'text-blue-800'     // Low Turnover
+                        : visitHistory.situation.bucketid === 2 
+                          ? 'text-green-800' // Within Range
+                          : visitHistory.situation.bucketid === 3
+                            ? 'text-red-800'   // High Turnover
+                            : 'text-gray-800' // Unknown
+                    }`}>
+                      {
+                        visitHistory.situation.bucketid === 1 ? 'Low Turnover' :
+                        visitHistory.situation.bucketid === 2 ? 'Within Range' :
+                        visitHistory.situation.bucketid === 3 ? 'High Turnover' :
+                        'Unknown Range'
+                      }
+                    </p>
+                    <p className="text-xs lg:text-sm text-gray-600 mt-1">
+                      {
+                        visitHistory.situation.bucketid === 1 ? 'PTH below target range' :
+                        visitHistory.situation.bucketid === 2 ? 'PTH within target range' :
+                        visitHistory.situation.bucketid === 3 ? 'PTH above target range' :
+                        'PTH range assessment pending'
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* Clinical Interpretation Summary */}
+                <div className="bg-blue-50 rounded-lg p-3 lg:p-4 border border-blue-200">
+                  <h5 className="font-semibold text-blue-800 text-sm lg:text-base mb-2">Clinical Interpretation</h5>
+                  <p className="text-xs lg:text-sm text-blue-700 leading-relaxed">
+                    <strong>Group {visitHistory.situation.groupid}</strong> indicates vascular calcification is{' '}
+                    <strong>{visitHistory.situation.groupid === 1 ? 'positive (+ve)' : 'negative (-ve)'}</strong>.{' '}
+                    <strong>Bucket {visitHistory.situation.bucketid}</strong> shows PTH is in{' '}
+                    <strong>
+                      {
+                        visitHistory.situation.bucketid === 1 ? 'low turnover' :
+                        visitHistory.situation.bucketid === 2 ? 'within range' :
+                        visitHistory.situation.bucketid === 3 ? 'high turnover' :
+                        'unknown'
+                      }
+                    </strong> category.{' '}
+                    Treatment should address both vascular health and PTH management based on these classifications.
                   </p>
                 </div>
               </div>
