@@ -90,6 +90,7 @@ export default function PatientReport({
           <head>
             <title>Patient Medical Report - ${patient.name}</title>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
               * { 
                 box-sizing: border-box; 
@@ -112,7 +113,7 @@ export default function PatientReport({
               /* Match the exact web styling */
               #patient-report-content {
                 background: white !important;
-                padding: 32px !important; /* p-8 = 32px */
+                padding: 16px !important; /* Smaller padding for print */
                 border-radius: 8px !important;
                 border: 1px solid #e5e7eb !important;
                 color: #000000 !important;
@@ -129,11 +130,11 @@ export default function PatientReport({
               .mb-4 { margin-bottom: 16px !important; }
               .mb-1 { margin-bottom: 4px !important; }
               
-              .text-2xl { font-size: 24px !important; font-weight: bold !important; }
-              .text-xl { font-size: 20px !important; font-weight: bold !important; }
-              .text-lg { font-size: 18px !important; font-weight: bold !important; }
-              .text-sm { font-size: 14px !important; }
-              .text-xs { font-size: 12px !important; }
+              .text-2xl { font-size: 20px !important; font-weight: bold !important; }
+              .text-xl { font-size: 18px !important; font-weight: bold !important; }
+              .text-lg { font-size: 16px !important; font-weight: bold !important; }
+              .text-sm { font-size: 12px !important; }
+              .text-xs { font-size: 10px !important; }
               
               .text-blue-700 { color: #1d4ed8 !important; }
               .text-black { color: #000000 !important; }
@@ -145,6 +146,7 @@ export default function PatientReport({
               .italic { font-style: italic !important; }
               
               /* Section styling - matches web */
+              .p-2 { padding: 8px !important; }
               .p-3 { padding: 12px !important; }
               .p-4 { padding: 16px !important; }
               .bg-gray-100 { background-color: #f3f4f6 !important; }
@@ -166,16 +168,19 @@ export default function PatientReport({
               .rounded { border-radius: 4px !important; }
               .rounded-lg { border-radius: 8px !important; }
               
-              /* Grid layouts - matches web */
+              /* Grid layouts - responsive */
               .grid { display: grid !important; }
+              .grid-cols-1 { grid-template-columns: 1fr !important; }
               .grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
               .grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
+              .gap-2 { gap: 8px !important; }
               .gap-3 { gap: 12px !important; }
               .gap-4 { gap: 16px !important; }
               
               /* Spacing - matches web */
               .space-y-3 > * + * { margin-top: 12px !important; }
               .space-y-2 > * + * { margin-top: 8px !important; }
+              .space-y-4 > * + * { margin-top: 16px !important; }
               
               /* Text alignment */
               .text-center { text-align: center !important; }
@@ -183,6 +188,7 @@ export default function PatientReport({
               /* Flexbox */
               .flex { display: flex !important; }
               .items-center { align-items: center !important; }
+              .justify-between { justify-content: space-between !important; }
               .gap-2 { gap: 8px !important; }
               
               /* Whitespace */
@@ -196,10 +202,11 @@ export default function PatientReport({
               /* Page break */
               .page-break-inside-avoid { page-break-inside: avoid !important; }
               
+              /* Responsive adjustments for print */
               @media print {
                 body { 
                   margin: 0 !important; 
-                  padding: 15px !important; 
+                  padding: 10px !important; 
                   -webkit-print-color-adjust: exact !important;
                   color-adjust: exact !important;
                   print-color-adjust: exact !important;
@@ -211,6 +218,12 @@ export default function PatientReport({
                   color-adjust: exact !important;
                   print-color-adjust: exact !important;
                 }
+                /* Make grids single column for print */
+                .grid-cols-2, .grid-cols-3 {
+                  grid-template-columns: 1fr !important;
+                }
+                .text-xs { font-size: 11px !important; }
+                .text-sm { font-size: 13px !important; }
               }
             </style>
           </head>
@@ -232,95 +245,97 @@ export default function PatientReport({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Print Button */}
+    <div className="space-y-4 lg:space-y-6">
+      {/* Print Button - MOBILE FRIENDLY */}
       <div className="flex justify-center no-print">
         <button
           onClick={handlePrint}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors duration-200 flex items-center gap-2"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 lg:py-3 px-4 lg:px-6 rounded-lg transition-colors duration-200 flex items-center gap-2 text-sm lg:text-base"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
           </svg>
-          Print Report
+          <span className="hidden sm:inline">Print Report</span>
+          <span className="sm:hidden">Print</span>
         </button>
       </div>
 
-      {/* Report Content */}
-      <div id="patient-report-content" className="bg-white p-8 rounded-lg border text-black">
-        {/* Header */}
-        <div className="text-center border-b-4 border-blue-600 pb-6 mb-8">
-          <h1 className="text-2xl font-bold text-blue-700 mb-2">KidneyCare Assistant</h1>
-          <p className="text-sm text-black mb-3">
+      {/* Report Content - MOBILE RESPONSIVE */}
+      <div id="patient-report-content" className="bg-white p-4 lg:p-8 rounded-lg border text-black">
+        {/* Header - MOBILE RESPONSIVE */}
+        <div className="text-center border-b-2 lg:border-b-4 border-blue-600 pb-4 lg:pb-6 mb-6 lg:mb-8">
+          <h1 className="text-lg lg:text-2xl font-bold text-blue-700 mb-2">KidneyCare Assistant</h1>
+          <p className="text-xs lg:text-sm text-black mb-2 lg:mb-3">
             Chronic Kidney Disease - Mineral and Bone Disorder Support System
           </p>
-          <h2 className="text-xl font-bold text-black">
+          <h2 className="text-base lg:text-xl font-bold text-black">
             Patient Medical Report - {visitType === "initial" ? "Initial Visit" : "Follow-up Visit"}
           </h2>
         </div>
 
-        {/* Patient Information */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-black mb-4 p-3 bg-gray-100 border-l-4 border-blue-600">
+        {/* Patient Information - MOBILE RESPONSIVE */}
+        <div className="mb-6 lg:mb-8">
+          <h3 className="text-base lg:text-lg font-bold text-black mb-3 lg:mb-4 p-2 lg:p-3 bg-gray-100 border-l-4 border-blue-600">
             Patient Information
           </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-3 border border-gray-300 rounded">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
+            <div className="p-2 lg:p-3 border border-gray-300 rounded">
               <div className="text-xs font-bold text-black uppercase mb-1">Patient Name</div>
-              <div className="text-black font-medium">{patient.name}</div>
+              <div className="text-black font-medium text-sm lg:text-base break-words">{patient.name}</div>
             </div>
-            <div className="p-3 border border-gray-300 rounded">
+            <div className="p-2 lg:p-3 border border-gray-300 rounded">
               <div className="text-xs font-bold text-black uppercase mb-1">Age</div>
-              <div className="text-black font-medium">{patient.age} years</div>
+              <div className="text-black font-medium text-sm lg:text-base">{patient.age} years</div>
             </div>
-            <div className="p-3 border border-gray-300 rounded">
+            <div className="p-2 lg:p-3 border border-gray-300 rounded">
               <div className="text-xs font-bold text-black uppercase mb-1">Gender</div>
-              <div className="text-black font-medium">{patient.gender}</div>
+              <div className="text-black font-medium text-sm lg:text-base capitalize">{patient.gender}</div>
             </div>
-            <div className="p-3 border border-gray-300 rounded">
-              <div className="text-xs font-bold text-black uppercase mb-1">National ID</div>
-              <div className="text-black font-medium">{patient.nationalid}</div>
+            <div className="p-2 lg:p-3 border border-gray-300 rounded">
+              <div className="text-xs font-bold text-black uppercase mb-1">Hospital ID</div>
+              {/* Natioal Id is used allover in backed and db, just for frontend changed to Hospital Id */}
+              <div className="text-black font-medium text-sm lg:text-base break-all">{patient.nationalid}</div>
             </div>
-            <div className="p-3 border border-gray-300 rounded">
+            <div className="p-2 lg:p-3 border border-gray-300 rounded">
               <div className="text-xs font-bold text-black uppercase mb-1">Visit Date</div>
-              <div className="text-black font-medium">{visitDate}</div>
+              <div className="text-black font-medium text-sm lg:text-base">{visitDate}</div>
             </div>
-            <div className="p-3 border border-gray-300 rounded">
+            <div className="p-2 lg:p-3 border border-gray-300 rounded">
               <div className="text-xs font-bold text-black uppercase mb-1">Doctor</div>
-              <div className="text-black font-medium">{doctorName}</div>
+              <div className="text-black font-medium text-sm lg:text-base break-words">{doctorName}</div>
             </div>
           </div>
         </div>
 
-        {/* Laboratory Results */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-black mb-4 p-3 bg-gray-100 border-l-4 border-blue-600">
+        {/* Laboratory Results - MOBILE RESPONSIVE */}
+        <div className="mb-6 lg:mb-8">
+          <h3 className="text-base lg:text-lg font-bold text-black mb-3 lg:mb-4 p-2 lg:p-3 bg-gray-100 border-l-4 border-blue-600">
             Laboratory Results
           </h3>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="p-4 border border-gray-400 rounded text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-3">
+            <div className="p-3 lg:p-4 border border-gray-400 rounded text-center">
               <div className="text-xs text-black font-bold mb-1">iPTH</div>
-              <div className="text-lg font-bold text-black">{testValues.PTH} pg/mL</div>
+              <div className="text-sm lg:text-lg font-bold text-black">{testValues.PTH} pg/mL</div>
             </div>
-            <div className="p-4 border border-gray-400 rounded text-center">
+            <div className="p-3 lg:p-4 border border-gray-400 rounded text-center">
               <div className="text-xs text-black font-bold mb-1">Calcium</div>
-              <div className="text-lg font-bold text-black">{testValues.Ca} mg/dL</div>
+              <div className="text-sm lg:text-lg font-bold text-black">{testValues.Ca} mg/dL</div>
             </div>
-            <div className="p-4 border border-gray-400 rounded text-center">
+            <div className="p-3 lg:p-4 border border-gray-400 rounded text-center">
               <div className="text-xs text-black font-bold mb-1">Albumin</div>
-              <div className="text-lg font-bold text-black">{testValues.Albumin} g/dL</div>
+              <div className="text-sm lg:text-lg font-bold text-black">{testValues.Albumin} g/dL</div>
             </div>
-            <div className="p-4 border border-gray-400 rounded text-center">
+            <div className="p-3 lg:p-4 border border-gray-400 rounded text-center">
               <div className="text-xs text-black font-bold mb-1">Corrected Calcium</div>
-              <div className="text-lg font-bold text-black">{testValues.CaCorrected} mg/dL</div>
+              <div className="text-sm lg:text-lg font-bold text-black">{testValues.CaCorrected} mg/dL</div>
             </div>
-            <div className="p-4 border border-gray-400 rounded text-center">
+            <div className="p-3 lg:p-4 border border-gray-400 rounded text-center">
               <div className="text-xs text-black font-bold mb-1">Phosphate</div>
-              <div className="text-lg font-bold text-black">{testValues.Phos} mg/dL</div>
+              <div className="text-sm lg:text-lg font-bold text-black">{testValues.Phos} mg/dL</div>
             </div>
-            <div className="p-4 border border-gray-400 rounded text-center">
+            <div className="p-3 lg:p-4 border border-gray-400 rounded text-center col-span-1 sm:col-span-2 lg:col-span-1">
               <div className="text-xs text-black font-bold mb-1">Imaging</div>
-              <div className="text-sm font-bold text-black">
+              <div className="text-xs lg:text-sm font-bold text-black leading-tight">
                 Echo: {formatEchoValue(testValues.Echo)}<br />
                 LA Rad: {formatLARadValue(testValues.LARad)}
               </div>
@@ -328,55 +343,55 @@ export default function PatientReport({
           </div>
         </div>
 
-        {/* Clinical Classification */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-black mb-4 p-3 bg-gray-100 border-l-4 border-blue-600">
+        {/* Clinical Classification - MOBILE RESPONSIVE */}
+        <div className="mb-6 lg:mb-8">
+          <h3 className="text-base lg:text-lg font-bold text-black mb-3 lg:mb-4 p-2 lg:p-3 bg-gray-100 border-l-4 border-blue-600">
             Clinical Classification
           </h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-4 border-2 border-blue-400 bg-blue-50 rounded text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
+            <div className="p-3 lg:p-4 border-2 border-blue-400 bg-blue-50 rounded text-center">
               <div className="text-xs font-bold text-black uppercase mb-1">Group</div>
-              <div className="text-xl font-bold text-black">{classification.group}</div>
+              <div className="text-lg lg:text-xl font-bold text-black">{classification.group}</div>
             </div>
-            <div className="p-4 border-2 border-green-400 bg-green-50 rounded text-center">
+            <div className="p-3 lg:p-4 border-2 border-green-400 bg-green-50 rounded text-center">
               <div className="text-xs font-bold text-black uppercase mb-1">Bucket</div>
-              <div className="text-xl font-bold text-black">{classification.bucket}</div>
+              <div className="text-lg lg:text-xl font-bold text-black">{classification.bucket}</div>
             </div>
-            <div className="p-4 border-2 border-amber-400 bg-amber-50 rounded text-center">
+            <div className="p-3 lg:p-4 border-2 border-amber-400 bg-amber-50 rounded text-center sm:col-span-3 lg:col-span-1">
               <div className="text-xs font-bold text-black uppercase mb-1">Situation</div>
-              <div className="text-xl font-bold text-black">{classification.situation}</div>
+              <div className="text-sm lg:text-xl font-bold text-black break-words">{classification.situation}</div>
             </div>
           </div>
         </div>
 
-        {/* Treatment Recommendations */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-black mb-4 p-3 bg-gray-100 border-l-4 border-blue-600">
+        {/* Treatment Recommendations - MOBILE RESPONSIVE */}
+        <div className="mb-6 lg:mb-8">
+          <h3 className="text-base lg:text-lg font-bold text-black mb-3 lg:mb-4 p-2 lg:p-3 bg-gray-100 border-l-4 border-blue-600">
             Treatment Recommendations
           </h3>
           {recommendations.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2 lg:space-y-3">
               {recommendations.map((rec, index) => (
-                <div key={index} className="p-3 border border-gray-300 bg-gray-50 rounded">
-                  <div className="text-sm font-bold text-black mb-1">
+                <div key={index} className="p-2 lg:p-3 border border-gray-300 bg-gray-50 rounded">
+                  <div className="text-xs lg:text-sm font-bold text-black mb-1 leading-tight">
                     {rec.questionText}
                   </div>
-                  <div className="text-black font-medium">
+                  <div className="text-black font-medium text-xs lg:text-sm leading-tight">
                     ✓ {rec.selectedOptionText}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="p-4 border border-gray-300 bg-gray-50 rounded text-center">
-              <p className="text-gray-600 italic">No specific recommendations recorded for this visit.</p>
+            <div className="p-3 lg:p-4 border border-gray-300 bg-gray-50 rounded text-center">
+              <p className="text-gray-600 italic text-xs lg:text-sm">No specific recommendations recorded for this visit.</p>
             </div>
           )}
         </div>
 
-        {/* Medication Prescriptions */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-black mb-4 p-3 bg-gray-100 border-l-4 border-blue-600">
+        {/* Medication Prescriptions - MOBILE RESPONSIVE */}
+        <div className="mb-6 lg:mb-8">
+          <h3 className="text-base lg:text-lg font-bold text-black mb-3 lg:mb-4 p-2 lg:p-3 bg-gray-100 border-l-4 border-blue-600">
             Medication Prescriptions
           </h3>
           {medications.length > 0 ? (
@@ -398,18 +413,18 @@ export default function PatientReport({
               }, {} as Record<string, MedicationData[]>);
 
               return Object.keys(prescribedMedications).length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3 lg:space-y-4">
                   {Object.keys(prescribedMedications).map(group => (
                     <div key={group} className="border border-gray-300 rounded-lg">
-                      <div className="bg-blue-50 p-3 border-b border-gray-300">
-                        <h4 className="font-bold text-black">{group}</h4>
+                      <div className="bg-blue-50 p-2 lg:p-3 border-b border-gray-300">
+                        <h4 className="font-bold text-black text-sm lg:text-base">{group}</h4>
                       </div>
-                      <div className="p-3">
-                        <div className="grid grid-cols-1 gap-2">
+                      <div className="p-2 lg:p-3">
+                        <div className="space-y-1 lg:space-y-2">
                           {prescribedMedications[group].map(med => (
-                            <div key={med.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                              <span className="text-black font-medium">{med.name}</span>
-                              <span className="text-black font-bold">{med.dosage} {med.unit}</span>
+                            <div key={med.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-2 bg-gray-50 rounded gap-1 sm:gap-2">
+                              <span className="text-black font-medium text-xs lg:text-sm break-words">{med.name}</span>
+                              <span className="text-black font-bold text-xs lg:text-sm flex-shrink-0">{med.dosage} {med.unit}</span>
                             </div>
                           ))}
                         </div>
@@ -418,37 +433,37 @@ export default function PatientReport({
                   ))}
                 </div>
               ) : (
-                <div className="p-4 border border-gray-300 bg-gray-50 rounded text-center">
-                  <p className="text-gray-600 italic">No medications prescribed for this visit.</p>
+                <div className="p-3 lg:p-4 border border-gray-300 bg-gray-50 rounded text-center">
+                  <p className="text-gray-600 italic text-xs lg:text-sm">No medications prescribed for this visit.</p>
                 </div>
               );
             })()
           ) : (
-            <div className="p-4 border border-gray-300 bg-gray-50 rounded text-center">
-              <p className="text-gray-600 italic">No medication data available for this visit.</p>
+            <div className="p-3 lg:p-4 border border-gray-300 bg-gray-50 rounded text-center">
+              <p className="text-gray-600 italic text-xs lg:text-sm">No medication data available for this visit.</p>
             </div>
           )}
         </div>
 
-        {/* Clinical Notes */}
+        {/* Clinical Notes - MOBILE RESPONSIVE */}
         {notes && (
-          <div className="mb-8">
-            <h3 className="text-lg font-bold text-black mb-4 p-3 bg-gray-100 border-l-4 border-blue-600">
+          <div className="mb-6 lg:mb-8">
+            <h3 className="text-base lg:text-lg font-bold text-black mb-3 lg:mb-4 p-2 lg:p-3 bg-gray-100 border-l-4 border-blue-600">
               Clinical Notes
             </h3>
-            <div className="p-4 border border-gray-300 bg-gray-50 rounded">
-              <p className="text-black leading-relaxed whitespace-pre-wrap">{notes}</p>
+            <div className="p-3 lg:p-4 border border-gray-300 bg-gray-50 rounded">
+              <p className="text-black leading-relaxed whitespace-pre-wrap text-xs lg:text-sm">{notes}</p>
             </div>
           </div>
         )}
 
-        {/* Important Patient Information */}
-        <div className="mb-8">
-          <div className="bg-amber-100 border border-amber-400 rounded-lg p-4">
-            <h4 className="font-bold text-black mb-2 flex items-center gap-2">
+        {/* Important Patient Information - MOBILE RESPONSIVE */}
+        <div className="mb-6 lg:mb-8">
+          <div className="bg-amber-100 border border-amber-400 rounded-lg p-3 lg:p-4">
+            <h4 className="font-bold text-black mb-2 flex items-center gap-2 text-sm lg:text-base">
               ⚠️ Important Patient Information
             </h4>
-            <div className="text-black text-sm leading-relaxed space-y-2">
+            <div className="text-black text-xs lg:text-sm leading-relaxed space-y-1 lg:space-y-2">
               <p>• Follow all medication instructions as prescribed by your doctor</p>
               <p>• Take medications at the same time each day for consistent results</p>
               <p>• Do not stop or change medication dosages without consulting your doctor</p>
@@ -460,9 +475,9 @@ export default function PatientReport({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="border-t-2 border-gray-300 pt-6 text-center">
-          <p className="text-black text-sm">
+        {/* Footer - MOBILE RESPONSIVE */}
+        <div className="border-t-2 border-gray-300 pt-4 lg:pt-6 text-center">
+          <p className="text-black text-xs lg:text-sm leading-tight">
             Generated by KidneyCare Assistant | {new Date().toLocaleString()} | This is a computer-generated report
           </p>
         </div>

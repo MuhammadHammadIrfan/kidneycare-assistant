@@ -51,13 +51,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: "Access denied: Patient does not belong to this doctor" });
     }
 
-    // CHECK FOR EXISTING MEDICATIONS BEFORE UPDATE
+    // **FIXED: CHECK FOR EXISTING MEDICATIONS FOR THIS SPECIFIC LAB REPORT**
     const { data: existingMedications, error: medicationsError } = await supabaseAdmin
       .from("MedicationPrescription")
       .select(`
         id,
         dosage,
-        isOutdated,
+        isoutdated,
         MedicationType (
           id,
           name,
@@ -65,17 +65,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           groupname
         )
       `)
-      .eq("reportid", labReportId)
-      .eq("isOutdated", false); // Only active medications
+      .eq("reportid", labReportId)       // lowercase column name
+      .eq("isoutdated", false);          // lowercase column name
 
     if (medicationsError) {
       console.error("Error checking medications:", medicationsError);
     }
 
     const hasActiveMedications = existingMedications && existingMedications.length > 0;
-    console.log(`[EDIT TEST RESULTS API] Found ${existingMedications?.length || 0} active medications`);
+    console.log(`[EDIT TEST RESULTS API] Found ${existingMedications?.length || 0} active medications for report ${labReportId}`);
 
-    // Get all test results for this lab report
+    // **FIXED: Get test results ONLY from LabReportTestLink for THIS lab report**
     const { data: allTestLinks, error: allTestLinksError } = await supabaseAdmin
       .from("LabReportTestLink")
       .select(`
@@ -91,14 +91,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           )
         )
       `)
-      .eq("labreportid", labReportId);
+      .eq("labreportid", labReportId);   // lowercase column name
 
     if (allTestLinksError) {
-      console.error("Error fetching all test results:", allTestLinksError);
+      console.error("Error fetching test results from LabReportTestLink:", allTestLinksError);
       return res.status(500).json({ error: "Failed to fetch test results for calculations" });
     }
 
-    // Process test results correctly
+    // Process test results correctly - handle array responses
     const allTests = allTestLinks?.map(link => {
       const testResult = link.TestResult;
       if (!testResult) return null;
@@ -130,7 +130,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     } => test !== null) || [];
 
-    console.log(`[EDIT TEST RESULTS API] Found ${allTests.length} existing test results`);
+    console.log(`[EDIT TEST RESULTS API] Found ${allTests.length} test results linked to lab report ${labReportId}`);
+
+    // Verify that the test results being updated actually belong to this lab report
+    const testResultIdsInReport = new Set(allTests.map(t => t.id));
+    const invalidUpdates = testResults.filter(tr => !testResultIdsInReport.has(tr.id));
+    
+    if (invalidUpdates.length > 0) {
+      console.error("Invalid test result updates:", invalidUpdates.map(u => u.id));
+      return res.status(400).json({ 
+        error: "Some test results do not belong to this lab report",
+        invalidIds: invalidUpdates.map(u => u.id)
+      });
+    }
 
     // Store original values for change tracking
     const originalValues = new Map<string, number>();
@@ -148,26 +160,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Track significant changes
+    // Track significant changes - FIXED VERSION
     const criticalChanges: string[] = [];
     let hasSignificantChanges = false;
-    
-    // Update the map with new values and track changes
+
+    // Update the map with new values and track changes - FIXED
     testResults.forEach(update => {
       const test = allTests.find(t => t.id === update.id);
       if (test && test.TestType) {
         const newValue = parseFloat(update.value.toString());
         const oldValue = test.value;
+        
+        // ONLY update the map and track changes for tests being updated
         testValueMap.set(test.TestType.code, newValue);
         
         // Track if critical values changed significantly (>5% change)
-        const changePercentage = Math.abs((newValue - oldValue) / oldValue) * 100;
-        if (changePercentage > 5 && ['PTH', 'Ca', 'CaCorrected', 'Phos', 'Echo', 'LARad'].includes(test.TestType.code)) {
+        const changePercentage = oldValue !== 0 ? Math.abs((newValue - oldValue) / oldValue) * 100 : 100;
+        
+        // FIXED: Only track if there's an actual change AND it's significant
+        if (oldValue !== newValue && changePercentage > 5 && ['PTH', 'Ca', 'CaCorrected', 'Phos', 'Echo', 'LARad'].includes(test.TestType.code)) {
           criticalChanges.push(`${test.TestType.code}: ${oldValue} → ${newValue} (${changePercentage.toFixed(1)}% change)`);
           hasSignificantChanges = true;
         }
         
-        console.log(`[EDIT TEST RESULTS API] Updated ${test.TestType.code}: ${oldValue} -> ${newValue}`);
+        console.log(`[EDIT TEST RESULTS API] Updated ${test.TestType.code}: ${oldValue} -> ${newValue} (${changePercentage.toFixed(1)}% change)`);
       }
     });
 
@@ -193,19 +209,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Find the CaCorrected test result
         const correctedCalciumTest = allTests.find(t => t.TestType.code === 'CaCorrected');
         if (correctedCalciumTest) {
+          const oldCorrectedCa = correctedCalciumTest.value;
+          
+          // ONLY track corrected calcium change if it actually changed significantly
+          const changePercentage = oldCorrectedCa !== 0 ? Math.abs((correctedCalcium - oldCorrectedCa) / oldCorrectedCa) * 100 : 100;
+          if (Math.abs(correctedCalcium - oldCorrectedCa) > 0.01 && changePercentage > 5) {
+            criticalChanges.push(`CaCorrected: ${oldCorrectedCa.toFixed(2)} → ${correctedCalcium.toFixed(2)} (auto-calculated, ${changePercentage.toFixed(1)}% change)`);
+            hasSignificantChanges = true;
+          }
+          
           correctedCalciumUpdate = {
             id: correctedCalciumTest.id,
             value: correctedCalcium
           };
           testValueMap.set('CaCorrected', correctedCalcium);
-          
-          // Track corrected calcium change
-          const oldCorrectedCa = originalValues.get('CaCorrected') || 0;
-          const changePercentage = Math.abs((correctedCalcium - oldCorrectedCa) / oldCorrectedCa) * 100;
-          if (changePercentage > 5) {
-            criticalChanges.push(`CaCorrected: ${oldCorrectedCa.toFixed(2)} → ${correctedCalcium.toFixed(2)} (auto-calculated, ${changePercentage.toFixed(1)}% change)`);
-            hasSignificantChanges = true;
-          }
         }
       }
     }
@@ -216,30 +233,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       allUpdates.push(correctedCalciumUpdate);
     }
 
+    // **FIXED: Update test results with proper verification**
     const updatePromises = allUpdates.map(async (testResult, index) => {
       const { id, value } = testResult;
       
       console.log(`[EDIT TEST RESULTS API] Processing test result ${index + 1}/${allUpdates.length}: ${id} = ${value}`);
       
-      // Verify the test result belongs to this lab report
-      const { data: existingTest, error: testCheckError } = await supabaseAdmin
+      // **DOUBLE CHECK: Verify the test result belongs to this lab report via LabReportTestLink**
+      const { data: existingLink, error: linkCheckError } = await supabaseAdmin
         .from("LabReportTestLink")
         .select("testresultid")
         .eq("labreportid", labReportId)
         .eq("testresultid", id)
         .single();
 
-      if (testCheckError || !existingTest) {
-        console.error(`Test verification error for ${id}:`, testCheckError);
-        throw new Error(`Test result ${id} does not belong to lab report ${labReportId}`);
+      if (linkCheckError || !existingLink) {
+        console.error(`Test link verification error for ${id}:`, linkCheckError);
+        throw new Error(`Test result ${id} is not linked to lab report ${labReportId}`);
       }
 
       // Update the test result with lastmodified tracking
-      const updateData = {
-        value: parseFloat(value.toString()),
-        lastmodified: new Date().toISOString(),
-        lastmodifiedby: doctorId
+      const updateData: any = {
+        value: parseFloat(value.toString())
       };
+
+      // Try to add lastmodified fields (might not exist)
+      try {
+        updateData.lastmodified = new Date().toISOString();
+        updateData.lastmodifiedby = doctorId;
+      } catch (e) {
+        console.log("lastmodified columns don't exist, using basic update");
+      }
 
       const { error: updateError } = await supabaseAdmin
         .from("TestResult")
@@ -247,19 +271,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq("id", id);
 
       if (updateError) {
-        if (updateError.message.includes('column') && updateError.message.includes('lastmodified')) {
-          // Fallback without lastmodified fields
-          const { error: fallbackError } = await supabaseAdmin
-            .from("TestResult")
-            .update({ value: parseFloat(value.toString()) })
-            .eq("id", id);
-          
-          if (fallbackError) {
-            throw new Error(`Failed to update test result ${id}: ${fallbackError.message}`);
-          }
-        } else {
-          throw new Error(`Failed to update test result ${id}: ${updateError.message}`);
-        }
+        console.error(`Failed to update test result ${id}:`, updateError);
+        throw new Error(`Failed to update test result ${id}: ${updateError.message}`);
       }
 
       console.log(`[EDIT TEST RESULTS API] Successfully updated test result ${id} with value ${value}`);
@@ -268,33 +281,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const updatedIds = await Promise.all(updatePromises);
 
-    // **NEW: MARK MEDICATIONS AS OUTDATED IF SIGNIFICANT CHANGES**
+    // **FIXED: MARK MEDICATIONS AS OUTDATED IF SIGNIFICANT CHANGES**
     let outdatedMedicationsCount = 0;
     let medicationOutdatingResult = null;
 
     if (hasActiveMedications && hasSignificantChanges) {
-      console.log(`[MEDICATION OUTDATING] Marking medications as outdated due to significant test changes`);
+      console.log(`[MEDICATION OUTDATING] Marking medications as outdated for report ${labReportId} due to significant test changes`);
       
       try {
-        // Mark existing medications as outdated - FIXED COLUMN NAMES
         const outdatingReason = `Test values updated: ${criticalChanges.join(', ')}`;
         
-        const { error: outdateError } = await supabaseAdmin
+        // **FIXED: Use correct column names (all lowercase)**
+        const { data: outdatedMeds, error: outdateError } = await supabaseAdmin
           .from("MedicationPrescription")
           .update({
-            isoutdated: true,           // lowercase
+            isoutdated: true,                        // lowercase
             outdatedat: new Date().toISOString(),    // lowercase  
             outdatedreason: outdatingReason,         // lowercase
             outdatedby: doctorId                     // lowercase
           })
-          .eq("reportid", labReportId)     // lowercase
-          .eq("isoutdated", false);        // lowercase
+          .eq("reportid", labReportId)               // lowercase
+          .eq("isoutdated", false)                   // lowercase
+          .select("id, dosage");                     // Get updated records
 
         if (outdateError) {
           console.error("Error marking medications as outdated:", outdateError);
-          // Continue with the process even if this fails
+          console.error("Error details:", JSON.stringify(outdateError, null, 2));
         } else {
-          outdatedMedicationsCount = existingMedications.length;
+          outdatedMedicationsCount = outdatedMeds?.length || 0;
           medicationOutdatingResult = {
             count: outdatedMedicationsCount,
             reason: outdatingReason,
@@ -304,7 +318,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               medication: med.MedicationType
             }))
           };
-          console.log(`[MEDICATION OUTDATING] Successfully marked ${outdatedMedicationsCount} medications as outdated`);
+          console.log(`[MEDICATION OUTDATING] Successfully marked ${outdatedMedicationsCount} medications as outdated for report ${labReportId}`);
         }
       } catch (error) {
         console.error("Error in medication outdating process:", error);
@@ -333,36 +347,142 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error("Failed to update lab report timestamp:", labReportUpdateError);
     }
 
-    console.log(`[EDIT TEST RESULTS API] Successfully updated ${updatedIds.length} test results and recalculated classification`);
+    console.log(`[EDIT TEST RESULTS API] Successfully updated ${updatedIds.length} test results and handled medication outdating`);
 
     // Prepare comprehensive response
+    // Current test change detection (keep this)
+    testResults.forEach(update => {
+      const test = allTests.find(t => t.id === update.id);
+      if (test && test.TestType) {
+        const newValue = parseFloat(update.value.toString());
+        const oldValue = test.value;
+        testValueMap.set(test.TestType.code, newValue);
+        
+        // Track if critical values changed significantly (>5% change)
+        const changePercentage = oldValue !== 0 ? Math.abs((newValue - oldValue) / oldValue) * 100 : 100;
+        if (changePercentage > 5 && ['PTH', 'Ca', 'CaCorrected', 'Phos', 'Echo', 'LARad'].includes(test.TestType.code)) {
+          criticalChanges.push(`${test.TestType.code}: ${oldValue} → ${newValue} (${changePercentage.toFixed(1)}% change)`);
+          hasSignificantChanges = true;
+        }
+      }
+    });
+
+    // ADD THIS: Check for classification changes after recalculation
+    const classificationUpdate = await recalculateAndUpdateClassificationUsingClassifyTs(
+      labReportId, 
+      testValueMap, 
+      basicLabReport.situationid,
+      basicLabReport.patientid
+    );
+
+    // Enhanced logic: Check for significant classification changes
+    let hasClassificationChange = false;
+    const classificationChanges: string[] = [];
+
+    if (classificationUpdate.changed && classificationUpdate.oldSituation && classificationUpdate.newSituation) {
+      const oldSit = classificationUpdate.oldSituation;
+      const newSit = classificationUpdate.newSituation;
+      
+      // Check for significant classification changes
+      if (oldSit.groupid !== newSit.groupid) {
+        hasClassificationChange = true;
+        classificationChanges.push(`Group changed: ${oldSit.groupid} → ${newSit.groupid}`);
+      }
+      
+      if (oldSit.bucketid !== newSit.bucketid) {
+        hasClassificationChange = true;
+        classificationChanges.push(`Bucket changed: ${oldSit.bucketid} → ${newSit.bucketid}`);
+      }
+      
+      // Situation change within same group/bucket might be less critical
+      if (oldSit.code !== newSit.code) {
+        classificationChanges.push(`Situation changed: ${oldSit.code} → ${newSit.code}`);
+        // Only mark as significant if it's a different group or bucket
+        if (oldSit.groupid !== newSit.groupid || oldSit.bucketid !== newSit.bucketid) {
+          hasClassificationChange = true;
+        }
+      }
+    }
+
+    // ENHANCED: Combine both conditions for medication outdating
+    const shouldOutdateMedications = hasActiveMedications && (hasSignificantChanges || hasClassificationChange);
+
+    if (shouldOutdateMedications && !medicationOutdatingResult) { // FIXED: Only run if not already done
+      console.log(`[MEDICATION OUTDATING] Marking medications as outdated for report ${labReportId}`);
+      console.log(`Reason - Test changes: ${hasSignificantChanges}, Classification changes: ${hasClassificationChange}`);
+      
+      try {
+        // Combine all change reasons
+        const allChanges = [...criticalChanges, ...classificationChanges];
+        const outdatingReason = `Changes detected: ${allChanges.join(', ')}`;
+        
+        const { data: outdatedMeds, error: outdateError } = await supabaseAdmin
+          .from("MedicationPrescription")
+          .update({
+            isoutdated: true,
+            outdatedat: new Date().toISOString(),
+            outdatedreason: outdatingReason,
+            outdatedby: doctorId
+          })
+          .eq("reportid", labReportId)
+          .eq("isoutdated", false)
+          .select("id, dosage");
+
+        if (!outdateError) {
+          outdatedMedicationsCount = outdatedMeds?.length || 0;
+          medicationOutdatingResult = {
+            count: outdatedMedicationsCount,
+            reason: outdatingReason,
+            testChanges: criticalChanges,
+            classificationChanges: classificationChanges,
+            medications: existingMedications.map(med => ({
+              id: med.id,
+              dosage: med.dosage,
+              medication: med.MedicationType
+            }))
+          };
+          console.log(`[MEDICATION OUTDATING] Successfully marked ${outdatedMedicationsCount} medications as outdated for report ${labReportId}`);
+        }
+      } catch (error) {
+        console.error("Error in medication outdating process:", error);
+      }
+    }
+
+    // FIXED: Improved warning message
+    let warningMessage = "";
+    if (shouldOutdateMedications) {
+      const allChanges = [...criticalChanges, ...classificationChanges].filter((change, index, array) => 
+        array.indexOf(change) === index // Remove duplicates
+      );
+      
+      warningMessage = `⚠️ MEDICATION REVIEW REQUIRED
+
+${allChanges.length > 0 ? `Changes detected:\n${allChanges.join('\n')}\n\n` : ''}${outdatedMedicationsCount} medication prescription(s) have been marked as outdated and require review.
+
+Please review and update medication dosages based on the ${hasSignificantChanges ? 'test value changes' : ''}${hasSignificantChanges && hasClassificationChange ? ' and ' : ''}${hasClassificationChange ? 'classification changes' : ''}.`;
+    } else if (hasActiveMedications) {
+      warningMessage = "✅ Test values updated. Existing medications remain valid (no significant changes).";
+    } else {
+      warningMessage = "✅ Test values updated successfully.";
+    }
+
+    // Update the response to include classification change info
     const response = {
       success: true,
-      message: `Updated ${updatedIds.length} test results and recalculated classification`,
+      message: `Updated ${updatedIds.length} test results${outdatedMedicationsCount > 0 ? ` and marked ${outdatedMedicationsCount} medications as outdated` : ''}`,
       updatedTestResults: updatedIds,
       correctedCalciumUpdated: !!correctedCalciumUpdate,
-      classificationChanged: newClassification.changed,
-      oldClassification: newClassification.oldSituation,
-      newClassification: {
-        ...newClassification.newSituation,
-        classifyResult: newClassification.classificationResult || {
-          group: newClassification.newSituation?.groupid,
-          bucket: newClassification.newSituation?.bucketid,
-          situation: newClassification.newSituation?.code
-        }
-      },
+      classificationUpdate: classificationUpdate,
       medicationImpact: {
         hasSignificantChanges,
-        criticalChanges,
+        hasClassificationChange,
+        criticalChanges: [...new Set(criticalChanges)], // Remove duplicates
+        classificationChanges: [...new Set(classificationChanges)], // Remove duplicates
         hadActiveMedications: hasActiveMedications,
         outdatedMedicationsCount,
         outdatedMedications: medicationOutdatingResult,
-        requiresReview: hasActiveMedications && hasSignificantChanges,
-        warningMessage: hasActiveMedications && hasSignificantChanges 
-          ? "⚠️ Test values changed significantly. Previous medication prescriptions have been marked as outdated and require review."
-          : hasActiveMedications 
-            ? "✅ Test values updated. Existing medications remain valid (no significant changes)."
-            : "✅ Test values updated successfully."
+        requiresReview: shouldOutdateMedications,
+        warningMessage
       }
     };
 
@@ -470,7 +590,7 @@ async function recalculateAndUpdateClassificationUsingClassifyTs(
     if (currentSituationId) {
       const { data: oldSit } = await supabaseAdmin
         .from("Situation")
-        .select("id, groupid, code, description")
+        .select("id, groupid, bucketid, code, description")
         .eq("id", currentSituationId)
         .single();
       oldSituation = oldSit;

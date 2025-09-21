@@ -8,7 +8,6 @@ const TESTS = [
   { code: "LARad", name: "Lateral Abdominal Radiography", type: "number", min: 0, max: 20, step: 0.1 },
 ];
 
-
 export default function TestInputTable({
   testValues,
   onChange,
@@ -25,29 +24,35 @@ export default function TestInputTable({
   testValues.CaCorrected = correctedCa.toFixed(2);
 
   return (
-    <div className="mt-8">
-      <h3 className="text-lg font-semibold text-blue-800 mb-2">Initial Test Results</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         {TESTS.map((test) => (
-          <div key={test.code}>
-            <label className="block text-gray-700 mb-1 font-medium">{test.name}</label>
+          <div key={test.code} className="space-y-2">
+            <label className="block text-gray-700 font-medium text-sm lg:text-base">
+              {test.name}
+              {test.type !== "readonly" && test.type !== "boolean" && (
+                <span className="text-red-500 ml-1">*</span>
+              )}
+            </label>
             {test.type === "boolean" ? (
-                <select
-                    name={test.code}
-                    value={testValues[test.code] ?? ""}
-                    onChange={(e) => onChange(e)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-black">
-                    <option value="">Select</option>
-                    <option value="1">True</option>
-                    <option value="0">False</option>
-                </select>
+              <select
+                name={test.code}
+                value={testValues[test.code] ?? ""}
+                onChange={(e) => onChange(e)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 lg:py-3 text-black bg-white text-sm lg:text-base h-10 lg:h-12 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select</option>
+                <option value="1">Positive</option>
+                <option value="0">Negative</option>
+              </select>
             ) : test.type === "readonly" ? (
               <input
                 type="text"
                 name={test.code}
                 value={testValues[test.code] || ""}
                 readOnly
-                className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 text-black"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 lg:py-3 bg-gray-100 text-black text-sm lg:text-base h-10 lg:h-12"
+                placeholder="Auto-calculated"
               />
             ) : (
               <input
@@ -58,12 +63,19 @@ export default function TestInputTable({
                 step={test.step}
                 min={test.min}
                 max={test.max}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-black"
-                placeholder={`Enter ${test.name}`}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 lg:py-3 text-black text-sm lg:text-base h-10 lg:h-12 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder={`Enter ${test.name.split('(')[0].trim()}`}
               />
             )}
           </div>
         ))}
+      </div>
+      
+      {/* Info note for mobile */}
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg lg:hidden">
+        <p className="text-xs text-blue-700">
+          💡 Corrected Calcium is automatically calculated based on Calcium and Albumin values.
+        </p>
       </div>
     </div>
   );

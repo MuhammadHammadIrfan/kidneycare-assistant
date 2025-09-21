@@ -68,12 +68,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("[CLOSEST_API] Found closest report:", closestReport.id);
 
-    // Get ACTIVE medication prescriptions for this report - FIXED
+    // Get ACTIVE medication prescriptions for this report - FIXED COLUMN NAMES
     const { data: prescriptions, error: prescError } = await supabaseAdmin
       .from("MedicationPrescription")
       .select("medicationtypeid, dosage, isoutdated")
-      .eq("reportid", closestReport.id)
-      .eq("isoutdated", false); // Only get active medications
+      .eq("reportid", closestReport.id)        // lowercase
+      .eq("isoutdated", false);                // lowercase
 
     console.log("[CLOSEST_API] Found ACTIVE prescriptions:", prescriptions?.length || 0);
     
@@ -140,7 +140,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("[CLOSEST_API] Extracted test results with codes:", testResults);
 
-    // Get medications for the closest report with active filter
+    // Get medications for the closest report with active filter - FIXED
     let closestMedications: any[] = [];
     if (closestReport) {
       const { data: medicationData, error: medicationError } = await supabaseAdmin
@@ -156,8 +156,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             groupname
           )
         `)
-        .eq("reportid", closestReport.id)
-        .or("isoutdated.is.null,isoutdated.eq.false"); // Get active medications
+        .eq("reportid", closestReport.id)        // lowercase
 
       if (!medicationError && medicationData) {
         closestMedications = medicationData.map(med => {
@@ -171,6 +170,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }).filter(med => med.MedicationType !== null);
       }
     }
+
+    console.log("[CLOSEST_API] Final response closestMedications:", closestMedications.length);
+    console.log("[CLOSEST_API] Sample closest medication:", closestMedications[0]);
 
     const response = {
       closest: {
@@ -190,34 +192,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error("[CLOSEST_API] Unexpected error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
-}
-
-// Helper function to find closest report with active medications
-async function findClosestLabReportWithActiveMedication(testValues: any) {
-  // This should be added to your medicationMatcher.ts file
-  // Updated to only consider reports with active (non-outdated) medications
-  
-  const { data: reportsWithMedications, error } = await supabaseAdmin
-    .from("LabReport")
-    .select(`
-      id,
-      patientid,
-      reportdate,
-      MedicationPrescription!inner (
-        id,
-        isoutdated
-      ),
-      LabReportTestLink (
-        TestResult (
-          value,
-          TestType (
-            code
-          )
-        )
-      )
-    `)
-    .eq("MedicationPrescription.isoutdated", false) // Only reports with active medications
-    .order("reportdate", { ascending: false });
-
-  // ... existing similarity matching logic
 }

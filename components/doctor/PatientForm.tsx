@@ -5,23 +5,46 @@ export default function PatientForm({ form, onChange }: {
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
       <div>
-        <label className="block text-gray-700 mb-1 font-medium">Name</label>
-        <Input name="name" value={form.name} onChange={onChange} required className="text-black" />
+        <label className="block text-gray-700 mb-2 font-medium text-sm lg:text-base">
+          Name <span className="text-red-500">*</span>
+        </label>
+        <Input 
+          name="name" 
+          value={form.name} 
+          onChange={onChange} 
+          required 
+          className="text-black text-sm lg:text-base h-10 lg:h-12" 
+          placeholder="Enter patient name"
+        />
       </div>
       <div>
-        <label className="block text-gray-700 mb-1 font-medium">Age</label>
-        <Input name="age" type="number" value={form.age} onChange={onChange} required className="text-black" />
+        <label className="block text-gray-700 mb-2 font-medium text-sm lg:text-base">
+          Age <span className="text-red-500">*</span>
+        </label>
+        <Input 
+          name="age" 
+          type="number" 
+          value={form.age} 
+          onChange={onChange} 
+          required 
+          className="text-black text-sm lg:text-base h-10 lg:h-12" 
+          placeholder="Enter age"
+          min="1"
+          max="120"
+        />
       </div>
       <div>
-        <label className="block text-gray-700 mb-1 font-medium">Gender</label>
+        <label className="block text-gray-700 mb-2 font-medium text-sm lg:text-base">
+          Gender <span className="text-red-500">*</span>
+        </label>
         <select
           name="gender"
           value={form.gender}
           onChange={onChange}
           required
-          className="w-full border border-gray-300 rounded-md px-3 py-2 text-black bg-white"
+          className="w-full border border-gray-300 rounded-md px-3 py-2 lg:py-3 text-black bg-white text-sm lg:text-base h-10 lg:h-12 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         >
           <option value="" disabled>Select gender</option>
           <option value="male">Male</option>
@@ -30,12 +53,31 @@ export default function PatientForm({ form, onChange }: {
         </select>
       </div>
       <div>
-        <label className="block text-gray-700 mb-1 font-medium">National ID</label>
-        <Input name="nationalId" value={form.nationalId} onChange={onChange} required className="text-black" />
+        <label className="block text-gray-700 mb-2 font-medium text-sm lg:text-base">
+          Hospital ID <span className="text-red-500">*</span>
+          {/* Natioal Id is used allover in backed and db, just for frontend changed to Hospital Id */}
+        </label>
+        <Input 
+          name="nationalId" 
+          value={form.nationalId} 
+          onChange={onChange} 
+          required 
+          className="text-black text-sm lg:text-base h-10 lg:h-12" 
+          placeholder="Enter hospital ID"
+        />
+        {/* Natioal Id is used allover in backed and db, just for frontend changed to Hospital Id */}
       </div>
-      <div>
-        <label className="block text-gray-700 mb-1 font-medium">Contact Info</label>
-        <Input name="contactInfo" value={form.contactInfo} onChange={onChange} className="text-black" />
+      <div className="lg:col-span-2">
+        <label className="block text-gray-700 mb-2 font-medium text-sm lg:text-base">
+          Contact Info
+        </label>
+        <Input 
+          name="contactInfo" 
+          value={form.contactInfo} 
+          onChange={onChange} 
+          className="text-black text-sm lg:text-base h-10 lg:h-12" 
+          placeholder="Enter contact information (optional)"
+        />
       </div>
     </div>
   );

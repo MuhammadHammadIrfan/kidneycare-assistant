@@ -36,8 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           groupname
         )
       `)
-      .eq("reportid", labReportId)
-      .eq("isoutdated", false) // Only get active medications
+      .eq("reportid", labReportId)           // lowercase
+      .eq("isoutdated", false)               // lowercase
       .order("createdat", { ascending: false });
 
     if (medicationsError) {
@@ -49,8 +49,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: outdatedCount } = await supabaseAdmin
       .from("MedicationPrescription")
       .select("id")
-      .eq("reportid", labReportId)
-      .eq("isoutdated", true);
+      .eq("reportid", labReportId)           // lowercase
+      .eq("isoutdated", true);               // lowercase
 
     console.log(`[GET SAVED] Found ${savedMedications?.length || 0} active and ${outdatedCount?.length || 0} outdated medications`);
 

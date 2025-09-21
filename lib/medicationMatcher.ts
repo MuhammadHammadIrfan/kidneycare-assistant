@@ -16,8 +16,8 @@ export async function findClosestLabReportWithMedication(testValues: { PTH: numb
   const { data: reportsWithMed, error: medError } = await supabaseAdmin
     .from("MedicationPrescription")
     .select("reportid")
-    .not("reportid", "is", null);
-  
+    .not("reportid", "is", null)
+    .eq("isoutdated", false); // only active medications
   console.log("[MEDICATION_MATCHER] Reports with medications (raw):", reportsWithMed?.length || 0);
   if (medError) console.error("[MEDICATION_MATCHER] Error fetching medication prescriptions:", medError);
   

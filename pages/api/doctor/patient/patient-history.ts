@@ -68,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`[PATIENT HISTORY API] Found ${labReports?.length || 0} lab reports`);
 
-    // For each lab report, get test results and recommendations
+    // For each lab report, get test results, recommendations, AND medications
     const visitHistory = await Promise.all(
       (labReports || []).map(async (report) => {
         // Get test results via LabReportTestLink - Fixed: Handle array response properly
@@ -147,11 +147,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           Option: Array.isArray(rec.Option) ? rec.Option[0] : rec.Option
         }));
 
-        // Get medication status for this report
+        // Get medications for this lab report - NEW
+        const { data: medications, error: medicationsError } = await supabaseAdmin
+          .from("MedicationPrescription")
+          .select(`
+            id,
+            dosage,
+            isoutdated,
+            createdat,
+            outdatedat,
+            outdatedreason,
+            outdatedby,
+            MedicationType (
+              id,
+              name,
+              unit,
+              groupname
+            )
+          `)
+          .eq("reportid", report.id)
+          .order("createdat", { ascending: false });
+
+        if (medicationsError) {
+          console.error(`Medications fetch error for report ${report.id}:`, medicationsError);
+        }
+
+        // Process medications (handle array responses if needed)
+        const processedMedications = (medications || []).map(med => ({
+          ...med,
+          MedicationType: Array.isArray(med.MedicationType) ? med.MedicationType[0] : med.MedicationType
+        }));
+
+        // Get medication status for this report - FIXED COLUMN NAMES
         const { data: medicationStatus, error: medStatusError } = await supabaseAdmin
           .from("MedicationPrescription")
-          .select("id, isoutdated, dosage")
-          .eq("reportid", report.id);
+          .select("id, isoutdated, dosage")      // lowercase column names
+          .eq("reportid", report.id);            // lowercase
 
         const activeMedications = medicationStatus?.filter(m => !m.isoutdated) || [];
         const outdatedMedications = medicationStatus?.filter(m => m.isoutdated) || [];
@@ -166,6 +197,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           lastmodifiedby: report.lastmodifiedby,
           testResults: testResults || [],
           recommendations: processedRecommendations || [],
+          medications: processedMedications || [], // NEW
           medicationStatus: {
             hasActive: activeMedications.length > 0,
             hasOutdated: outdatedMedications.length > 0,

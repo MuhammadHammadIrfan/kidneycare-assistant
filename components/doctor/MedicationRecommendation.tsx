@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "../ui/button";
-import { AlertTriangle, Info, CheckCircle, ChevronDown, ChevronUp, Clock, Pill } from "lucide-react";
+import { AlertTriangle, Info, CheckCircle, ChevronDown, ChevronUp, Clock, Pill, History } from "lucide-react";
 
 interface MedicationType {
   id: number;
@@ -34,13 +34,19 @@ interface MedicationRecommendationProps {
   testValues: any;
   classification: { group: number; bucket: number };
   onSaved?: () => void;
+  disabled?: boolean;                    // NEW
+  onSavingStart?: () => void;           // NEW
+  onSavingEnd?: () => void;             // NEW
 }
 
 const MedicationRecommendation: React.FC<MedicationRecommendationProps> = ({ 
   labReportId, 
   testValues, 
   classification, 
-  onSaved 
+  onSaved,
+  disabled = false,                     // NEW
+  onSavingStart,                       // NEW
+  onSavingEnd                          // NEW
 }) => {
   const [medications, setMedications] = useState<MedicationType[]>([]);
   const [previousMedications, setPreviousMedications] = useState<PreviousMedication[]>([]);
@@ -53,6 +59,7 @@ const MedicationRecommendation: React.FC<MedicationRecommendationProps> = ({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [previousReport, setPreviousReport] = useState<any>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -80,6 +87,16 @@ const MedicationRecommendation: React.FC<MedicationRecommendationProps> = ({
           setClosest(closestData.closest || null);
           setClosestTestResults(closestData.testResults || null);
           setClosestMedications(closestData.closestMedications || []);
+          
+          // ADD THESE DEBUG LOGS
+          console.log("[DEBUG] Closest medications data:", closestData.closestMedications);
+          console.log("[DEBUG] Closest medications length:", closestData.closestMedications?.length);
+          console.log("[DEBUG] Grouped closest medications:", closestMedications.reduce((acc: Record<string, PreviousMedication[]>, med) => {
+            const groupname = med.MedicationType?.groupname || 'unknown';
+            if (!acc[groupname]) acc[groupname] = [];
+            acc[groupname].push(med);
+            return acc;
+          }, {} as Record<string, PreviousMedication[]>));
         }
 
         // Fetch patient's previous medications
@@ -134,6 +151,9 @@ const MedicationRecommendation: React.FC<MedicationRecommendationProps> = ({
     setSaving(true);
     setError(null);
     
+    // Notify parent that saving started
+    if (onSavingStart) onSavingStart();
+    
     try {
       const res = await fetch("/api/doctor/patient/medication/save", {
         method: "POST",
@@ -143,9 +163,9 @@ const MedicationRecommendation: React.FC<MedicationRecommendationProps> = ({
       
       const responseData = await res.json();
       console.log("[MEDICATION_COMPONENT] Save response:", responseData);
-      
       if (res.ok) {
         console.log("[MEDICATION_COMPONENT] Save successful");
+        setSuccess("Medications saved successfully");
         if (onSaved) onSaved();
       } else {
         console.error("[MEDICATION_COMPONENT] Save failed:", responseData);
@@ -154,9 +174,11 @@ const MedicationRecommendation: React.FC<MedicationRecommendationProps> = ({
     } catch (err) {
       console.error("[MEDICATION_COMPONENT] Save error:", err);
       setError("Network error while saving medications");
+    } finally {
+      setSaving(false);
+      // Notify parent that saving ended
+      if (onSavingEnd) onSavingEnd();
     }
-    
-    setSaving(false);
   };
 
   // Group medications by groupname
@@ -345,39 +367,50 @@ const MedicationRecommendation: React.FC<MedicationRecommendationProps> = ({
             </div>
           )}
           
-          {/* Current Prescription Form */}
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <h4 className="text-sm font-medium text-gray-800 mb-3 flex items-center">
+          {/* Current Prescription Form - MOBILE RESPONSIVE */}
+          <div className="bg-gray-50 rounded-lg p-3 lg:p-4 border border-gray-200">
+            <h4 className="text-sm lg:text-base font-medium text-gray-800 mb-3 flex items-center">
               <Pill className="w-4 h-4 mr-1" />
               Current Prescription
             </h4>
             
             {Object.keys(grouped).length > 0 ? Object.keys(grouped).map(group => (
-              <div key={group} className="mb-6">
-                <div className="font-semibold text-blue-700 mb-3 pb-1 border-b border-blue-200">{group}</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div key={group} className="mb-4 lg:mb-6">
+                <div className="font-semibold text-blue-700 mb-3 pb-1 border-b border-blue-200 text-sm lg:text-base">
+                  {group}
+                </div>
+                <div className="space-y-2 lg:space-y-3">
                   {grouped[group].map(med => {
                     const previousMed = previousMedications.find(pm => pm.medicationtypeid === med.id);
                     return (
-                      <div key={med.id} className="flex items-center space-x-3 p-3 bg-white rounded border border-gray-200">
-                        <span className="flex-1 text-gray-800 font-medium">{med.name}</span>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            className="border border-gray-300 rounded px-2 py-1 w-20 text-center text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            value={med.dosage}
-                            onChange={e => handleDosageChange(med.id, e.target.value)}
-                            placeholder="0"
-                          />
-                          <span className="text-gray-800 text-sm font-medium min-w-0 flex-shrink-0">{med.unit}</span>
-                        </div>
-                        {previousMed && (
-                          <div className="text-xs text-gray-500">
-                            (Previous: {previousMed.dosage})
+                      <div key={med.id} className="p-3 bg-white rounded border border-gray-200">
+                        {/* MOBILE: Stack vertically, DESKTOP: Side by side */}
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-2 lg:space-y-0">
+                          <div className="flex-1">
+                            <span className="text-gray-800 font-medium text-sm lg:text-base leading-tight block">
+                              {med.name}
+                            </span>
+                            {previousMed && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Previous: {previousMed.dosage} {med.unit}
+                              </div>
+                            )}
                           </div>
-                        )}
+                          <div className="flex items-center space-x-2 lg:space-x-3">
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              className="border border-gray-300 rounded px-2 py-1 w-20 lg:w-24 text-center text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:text-base"
+                              value={med.dosage}
+                              onChange={e => handleDosageChange(med.id, e.target.value)}
+                              placeholder="0"
+                            />
+                            <span className="text-gray-800 text-sm lg:text-base font-medium min-w-max">
+                              {med.unit}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -385,28 +418,93 @@ const MedicationRecommendation: React.FC<MedicationRecommendationProps> = ({
               </div>
             )) : (
               <div className="text-center py-4 text-gray-500">
-                <p>No medication groups available</p>
+                <p className="text-sm lg:text-base">No medication groups available</p>
               </div>
             )}
           </div>
           
-          {/* Update the button in MedicationRecommendation.tsx around line 399*/}
-          <div className="flex justify-end mt-6 pt-4 border-t border-gray-200">
+          {/* Previous Medications Comparison - MOBILE RESPONSIVE */}
+          {previousMedications.length > 0 && (
+            <div className="bg-blue-50 rounded-lg p-3 lg:p-4 border border-blue-200">
+              <h4 className="text-sm lg:text-base font-medium text-blue-800 mb-3 flex items-center">
+                <History className="w-4 h-4 mr-1" />
+                Previous Medications (Last Visit)
+              </h4>
+              <div className="space-y-2">
+                {previousMedications.filter(pm => pm.dosage > 0).map(prevMed => {
+                  const currentMed = medications.find(m => m.id === prevMed.medicationtypeid);
+                  const currentDosage = currentMed?.dosage || 0;
+                  const previousDosage = prevMed.dosage;
+                  const hasChanged = currentDosage !== previousDosage;
+                  
+                  return (
+                    <div key={prevMed.id} className="bg-white p-2 lg:p-3 rounded border border-blue-100">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                        <span className="text-gray-800 font-medium text-xs lg:text-sm">
+                          {prevMed.MedicationType.name}
+                        </span>
+                        <div className="flex items-center space-x-2 text-xs lg:text-sm">
+                          <span className="text-gray-600">
+                            Was: {previousDosage} {prevMed.MedicationType.unit}
+                          </span>
+                          <span className="text-gray-400">→</span>
+                          <span className={`font-medium ${hasChanged ? 'text-blue-700' : 'text-gray-600'}`}>
+                            Now: {currentDosage} {prevMed.MedicationType.unit}
+                          </span>
+                          {hasChanged && (
+                            <span className="text-xs text-blue-600 font-medium bg-blue-100 px-1 rounded">
+                              Modified
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Save Button and Status - MOBILE RESPONSIVE */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mt-4 lg:mt-6 pt-4 border-t border-gray-200">
+            <div className="text-xs lg:text-sm text-gray-600">
+              {medications.filter(m => m.dosage > 0).length} medications prescribed
+            </div>
+            
             <Button 
               onClick={handleSave} 
-              disabled={saving || medications.length === 0}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg disabled:bg-gray-400 font-medium"
+              disabled={disabled || saving || medications.length === 0}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 lg:px-8 py-2 lg:py-3 rounded-lg disabled:bg-gray-400 font-medium text-sm lg:text-base"
             >
-              {saving ? "Saving..." : "Save Medications"}
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Saving...
+                </span>
+              ) : disabled ? (
+                "Another save in progress..."
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Pill className="w-4 h-4" />
+                  Save Medications
+                </span>
+              )}
             </Button>
           </div>
-          
-          {error && (
-            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-              <p className="text-red-700 text-sm flex items-center">
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                {error}
-              </p>
+
+          {/* Success/Error Messages - MOBILE RESPONSIVE */}
+          {(success || error) && (
+            <div className="mt-4">
+              {success && (
+                <div className="p-3 lg:p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-green-700 text-sm lg:text-base">{success}</p>
+                </div>
+              )}
+              {error && (
+                <div className="p-3 lg:p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 text-sm lg:text-base">{error}</p>
+                </div>
+              )}
             </div>
           )}
         </>

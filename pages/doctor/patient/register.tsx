@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Menu, User, TestTube, FileText, CheckCircle, TrendingUp, AlertTriangle } from "lucide-react";
 import DoctorSidebar from "../../../components/doctor/DoctorSidebar";
@@ -15,8 +15,46 @@ export async function getServerSideProps(context: any) {
 }
 
 export default function RegisterPatient({ user }: { user: any }) {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  // FIXED: Proper sidebar state management
+  const [isSidebarOpen, setSidebarOpen] = useState<boolean | undefined>(undefined);
   const [currentStep, setCurrentStep] = useState<"patient" | "tests" | "recommendations" | "complete">("patient");
+  
+  // Initialize sidebar state based on screen size
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        // Desktop: sidebar open by default (unless explicitly closed)
+        if (isSidebarOpen === undefined) {
+          setSidebarOpen(true);
+        }
+      } else {
+        // Mobile: sidebar closed by default
+        if (isSidebarOpen === undefined) {
+          setSidebarOpen(false);
+        }
+      }
+    };
+
+    // Initial check
+    handleResize();
+    
+    // Listen for window resize
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isSidebarOpen]);
+
+  // Toggle sidebar function
+  const toggleSidebar = () => {
+    setSidebarOpen(!isSidebarOpen);
+  };
+
+  // Close sidebar function (for mobile)
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+  };
   
   // Patient form data
   const [form, setForm] = useState({
@@ -55,6 +93,7 @@ export default function RegisterPatient({ user }: { user: any }) {
   const [medicationsSaved, setMedicationsSaved] = useState(false);
   const [savedMedications, setSavedMedications] = useState<any[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [anythingSaving, setAnythingSaving] = useState(false);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -125,7 +164,6 @@ export default function RegisterPatient({ user }: { user: any }) {
   const handleRecommendationsSaved = (recommendations: any[]) => {
     setSavedRecommendations(recommendations);
     setSuccess("Recommendations saved successfully! You can now proceed to medications or complete the registration.");
-    // Don't automatically complete the registration here - let the user choose when to complete
   };
 
   const handleMedicationsSaved = () => {
@@ -137,13 +175,11 @@ export default function RegisterPatient({ user }: { user: any }) {
     const hasRecommendations = savedRecommendations.length > 0;
     const hasMedications = medicationsSaved;
 
-    // If both are saved or user wants to proceed anyway, complete the registration
     if (hasRecommendations && hasMedications) {
       fetchMedicationsForReport();
       return;
     }
 
-    // Show confirmation dialog if something is missing
     setShowConfirmDialog(true);
   };
 
@@ -210,316 +246,382 @@ export default function RegisterPatient({ user }: { user: any }) {
     ];
 
     return (
-      <div className="flex justify-center mb-8">
-        <div className="flex items-center space-x-4">
-          {steps.map((step, index) => {
-            const Icon = step.icon;
-            const isActive = currentStep === step.key;
-            const isCompleted = steps.findIndex(s => s.key === currentStep) > index;
-            
-            return (
-              <div key={step.key} className="flex items-center">
-                <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors
-                    ${isActive 
-                      ? "bg-blue-600 border-blue-600 text-white" 
-                      : isCompleted 
-                        ? "bg-green-600 border-green-600 text-white"
-                        : "bg-gray-200 border-gray-300 text-gray-500"
-                    }`}
-                >
-                  <Icon className="w-5 h-5" />
+      <div className="mb-4 lg:mb-8">
+        {/* Mobile: Horizontal scroll, Desktop: Centered */}
+        <div className="block sm:hidden">
+          <div className="overflow-x-auto pb-2">
+            <div className="flex items-center space-x-3 min-w-max px-4">
+              {steps.map((step, index) => {
+                const Icon = step.icon;
+                const isActive = currentStep === step.key;
+                const isCompleted = steps.findIndex(s => s.key === currentStep) > index;
+                
+                return (
+                  <div key={step.key} className="flex items-center flex-shrink-0">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-colors mb-1
+                          ${isActive 
+                            ? "bg-blue-600 border-blue-600 text-white" 
+                            : isCompleted 
+                              ? "bg-green-600 border-green-600 text-white"
+                              : "bg-gray-200 border-gray-300 text-gray-500"
+                          }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className={`text-xs font-medium text-center whitespace-nowrap ${
+                        isActive ? "text-blue-600" : "text-gray-500"
+                      }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                    
+                    {index < steps.length - 1 && (
+                      <div className={`w-6 h-0.5 mx-2 mt-[-8px] ${
+                        isCompleted ? "bg-green-600" : "bg-gray-300"
+                      }`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Tablet and Desktop: Horizontal centered layout */}
+        <div className="hidden sm:flex justify-center">
+          <div className="flex items-center space-x-4 lg:space-x-6">
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = currentStep === step.key;
+              const isCompleted = steps.findIndex(s => s.key === currentStep) > index;
+              
+              return (
+                <div key={step.key} className="flex items-center">
+                  <div
+                    className={`flex items-center justify-center w-10 h-10 lg:w-12 lg:h-12 rounded-full border-2 transition-colors
+                      ${isActive 
+                        ? "bg-blue-600 border-blue-600 text-white" 
+                        : isCompleted 
+                          ? "bg-green-600 border-green-600 text-white"
+                          : "bg-gray-200 border-gray-300 text-gray-500"
+                      }`}
+                  >
+                    <Icon className="w-5 h-5 lg:w-6 lg:h-6" />
+                  </div>
+                  <span className={`ml-2 lg:ml-3 text-sm lg:text-base font-medium ${
+                    isActive ? "text-blue-600" : "text-gray-500"
+                  }`}>
+                    {step.label}
+                  </span>
+                  
+                  {index < steps.length - 1 && (
+                    <div className={`w-8 lg:w-12 h-0.5 ml-4 lg:ml-6 ${
+                      isCompleted ? "bg-green-600" : "bg-gray-300"
+                    }`} />
+                  )}
                 </div>
-                <span className={`ml-2 text-sm font-medium ${isActive ? "text-blue-600" : "text-gray-500"}`}>
-                  {step.label}
-                </span>
-                {index < steps.length - 1 && (
-                  <div className={`w-8 h-0.5 ml-4 ${isCompleted ? "bg-green-600" : "bg-gray-300"}`} />
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-blue-100 via-white to-rose-100">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-rose-100">
       {/* Sidebar */}
-      <DoctorSidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <DoctorSidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
 
-      {/* Main Content */}
-      <main className="flex-1 p-10 lg:ml-64 transition-all">
-        <button
-          className="lg:hidden mb-4 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <Menu className="w-6 h-6" />
-        </button>
-
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-3xl font-bold text-blue-900 mb-8"
-        >
-          Register New Patient
-        </motion.h1>
-
-        {renderStepIndicator()}
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700">{error}</p>
+      {/* Main Content - FIXED: Dynamic margin based on sidebar state */}
+      <div className={`transition-all duration-300 min-h-screen ${
+        isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
+      }`}>
+        <div className="p-3 lg:p-6 xl:p-10">
+          {/* Mobile/Desktop Menu Button */}
+          <div className="mb-4">
+            <button
+              className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
+              onClick={toggleSidebar}
+            >
+              <Menu className="w-6 h-6" />
+            </button>
           </div>
-        )}
 
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-700">{success}</p>
-          </div>
-        )}
-
-        {/* Step 1: Patient Information */}
-        {currentStep === "patient" && (
-          <motion.div
+          <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
+            transition={{ duration: 0.5 }}
+            className="text-xl lg:text-2xl xl:text-3xl font-bold text-blue-900 mb-4 lg:mb-8"
           >
-            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-xl font-bold text-blue-900 mb-6">Patient Information</h3>
-              <PatientForm form={form} onChange={handleFormChange} />
-              
-              <div className="flex justify-end mt-8">
+            Register New Patient
+          </motion.h1>
+
+          {renderStepIndicator()}
+
+          {error && (
+            <div className="mb-4 lg:mb-6 p-3 lg:p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm lg:text-base">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 lg:mb-6 p-3 lg:p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-700 text-sm lg:text-base">{success}</p>
+            </div>
+          )}
+
+          {/* Step 1: Patient Information */}
+          {currentStep === "patient" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+            >
+              <div className="bg-white/90 rounded-xl shadow-lg p-4 lg:p-6 border border-blue-100">
+                <h3 className="text-lg lg:text-xl font-bold text-blue-900 mb-4 lg:mb-6">Patient Information</h3>
+                <PatientForm form={form} onChange={handleFormChange} />
+                
+                <div className="flex justify-end mt-6 lg:mt-8">
+                  <Button
+                    onClick={handlePatientSubmit}
+                    className="w-full lg:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 lg:px-8 py-2 lg:py-3"
+                  >
+                    Continue to Test Results
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 2: Test Results */}
+          {currentStep === "tests" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="space-y-4 lg:space-y-6"
+            >
+              {/* Patient Info Summary */}
+              <div className="bg-white/90 rounded-xl shadow-lg p-4 lg:p-6 border border-blue-100">
+                <h3 className="text-base lg:text-lg font-semibold text-blue-800 mb-4">Patient Summary</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600">Name:</p>
+                    <p className="font-medium text-gray-900 truncate">{form.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Age:</p>
+                    <p className="font-medium text-gray-900">{form.age} years</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Hospital ID:</p>
+                    {/* Natioal Id is used allover in backed and db, just for frontend changed to Hospital Id */}
+                    <p className="font-medium text-gray-900 break-all">{form.nationalId}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Test Input */}
+              <div className="bg-white/90 rounded-xl shadow-lg p-4 lg:p-6 border border-blue-100">
+                <h3 className="text-lg lg:text-xl font-bold text-blue-900 mb-4 lg:mb-6">Initial Test Results</h3>
+                <TestInputTable testValues={testValues} onChange={handleTestChange} />
+
+                <div className="flex flex-col lg:flex-row justify-between gap-3 lg:gap-4 mt-6 lg:mt-8">
+                  <Button
+                    onClick={() => setCurrentStep("patient")}
+                    className="w-full lg:w-auto px-6 border border-gray-300 bg-white text-gray-800 hover:bg-gray-100"
+                  >
+                    Back to Patient Info
+                  </Button>
+                  <Button
+                    onClick={handleTestSubmit}
+                    disabled={loading}
+                    className="w-full lg:w-auto bg-rose-600 hover:bg-rose-700 text-white px-6 lg:px-8"
+                  >
+                    {loading ? "Processing..." : "Register & Generate Recommendations"}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 3: Recommendations */}
+          {currentStep === "recommendations" && classificationResult && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="space-y-4 lg:space-y-6"
+            >
+              {/* Patient Summary */}
+              <div className="bg-white/90 rounded-xl shadow-lg p-4 lg:p-6 border border-blue-100">
+                <h3 className="text-base lg:text-lg font-semibold text-blue-800 mb-4">New Patient Registered</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600">Name:</p>
+                    <p className="font-medium text-gray-900 truncate">{form.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Age:</p>
+                    <p className="font-medium text-gray-900">{form.age} years</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Patient ID:</p>
+                    <p className="font-medium text-gray-900 text-xs break-all">{classificationResult.patientId}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Classification Result */}
+              <div className="bg-white/90 rounded-xl shadow-lg p-4 lg:p-6 border border-blue-100">
+                <h3 className="text-base lg:text-lg font-semibold text-blue-800 mb-4">Classification Result</h3>
+                <div className="grid grid-cols-3 gap-3 lg:gap-4">
+                  <div className="text-center p-3 lg:p-4 bg-blue-50 rounded-lg">
+                    <p className="text-gray-600 text-xs lg:text-sm">Group</p>
+                    <p className="text-xl lg:text-2xl font-bold text-blue-900">{classificationResult.group}</p>
+                  </div>
+                  <div className="text-center p-3 lg:p-4 bg-green-50 rounded-lg">
+                    <p className="text-gray-600 text-xs lg:text-sm">Bucket</p>
+                    <p className="text-xl lg:text-2xl font-bold text-green-900">{classificationResult.bucket}</p>
+                  </div>
+                  <div className="text-center p-3 lg:p-4 bg-rose-50 rounded-lg">
+                    <p className="text-gray-600 text-xs lg:text-sm">Situation</p>
+                    <p className="text-lg lg:text-2xl font-bold text-rose-900 break-words">{classificationResult.situation}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recommendations Table */}
+              <RecommendationTable
+                situationId={classificationResult.situationId}
+                labReportId={classificationResult.labReportId}
+                onRecommendationsSaved={handleRecommendationsSaved}
+                disabled={anythingSaving}
+                onSavingStart={() => setAnythingSaving(true)}
+                onSavingEnd={() => setAnythingSaving(false)}
+              />
+
+              {/* Medication Recommendation */}
+              <MedicationRecommendation
+                labReportId={classificationResult.labReportId}
+                testValues={testValues}
+                classification={classificationResult}
+                onSaved={handleMedicationsSaved}
+                disabled={anythingSaving}
+                onSavingStart={() => setAnythingSaving(true)}
+                onSavingEnd={() => setAnythingSaving(false)}
+              />
+
+              {/* Trend Analysis for New Patient */}
+              <div className="bg-white/90 rounded-xl shadow-lg p-4 lg:p-6 border border-blue-100">
+                <h3 className="text-base lg:text-lg font-semibold text-blue-800 mb-4">Lab Test Trends</h3>
+                <p className="text-gray-600 text-sm lg:text-base mb-4">
+                  This is the first visit for this patient. Trends will be available after future visits.
+                </p>
+                <div className="bg-gray-50 rounded-lg p-6 lg:p-8 text-center">
+                  <TrendingUp className="w-8 h-8 lg:w-12 lg:h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm lg:text-base">Trend analysis will be available after multiple visits</p>
+                </div>
+              </div>
+
+              {/* Complete Registration Button */}
+              <div className="flex justify-center pt-4">
                 <Button
-                  onClick={handlePatientSubmit}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                  onClick={handleCompleteRegistration}
+                  disabled={anythingSaving}
+                  className="w-full lg:w-auto bg-green-600 hover:bg-green-700 text-white px-6 lg:px-8 py-3 disabled:bg-gray-400"
                 >
-                  Continue to Test Results
+                  {anythingSaving ? "Save in progress..." : "Complete Patient Registration"}
                 </Button>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
 
-        {/* Step 2: Test Results */}
-        {currentStep === "tests" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="space-y-6"
-          >
-            {/* Patient Info Summary */}
-            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-blue-800 mb-4">Patient Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Name:</p>
-                  <p className="font-medium text-gray-900">{form.name}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Age:</p>
-                  <p className="font-medium text-gray-900">{form.age} years</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">National ID:</p>
-                  <p className="font-medium text-gray-900">{form.nationalId}</p>
-                </div>
+          {/* Step 4: Complete */}
+          {currentStep === "complete" && classificationResult && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="text-center space-y-4 lg:space-y-6"
+            >
+              <div className="bg-green-50 border border-green-200 rounded-xl p-6 lg:p-8">
+                <CheckCircle className="w-12 h-12 lg:w-16 lg:h-16 text-green-600 mx-auto mb-4" />
+                <h2 className="text-xl lg:text-2xl font-bold text-green-800 mb-2">
+                  Patient Successfully Registered!
+                </h2>
+                <p className="text-green-700 text-sm lg:text-base">
+                  {form.name} has been registered and initial recommendations have been generated.
+                </p>
               </div>
-            </div>
 
-            {/* Test Input */}
-            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-xl font-bold text-blue-900 mb-6">Initial Test Results</h3>
-              <TestInputTable testValues={testValues} onChange={handleTestChange} />
+              {/* Patient Report */}
+              <PatientReport
+                patient={{
+                  name: form.name,
+                  age: parseInt(form.age),
+                  gender: form.gender,
+                  nationalid: form.nationalId,
+                  contactinfo: form.contactInfo || ""
+                }}
+                testValues={testValues}
+                classification={classificationResult}
+                recommendations={savedRecommendations}
+                medications={savedMedications}
+                visitType="initial"
+                doctorName={user?.name || "Dr. [Doctor Name]"}
+                visitDate={new Date().toLocaleDateString()}
+                notes=""
+              />
 
-              <div className="flex justify-between mt-8">
+              {/* Action buttons */}
+              <div className="flex flex-col lg:flex-row justify-center gap-3 lg:gap-4 pt-4">
                 <Button
-                  onClick={() => setCurrentStep("patient")}
-                  className="px-6 border border-gray-300 bg-white text-gray-800 hover:bg-gray-100"
+                  onClick={handleStartNewRegistration}
+                  className="w-full lg:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 lg:px-8"
                 >
-                  Back to Patient Info
+                  Register Another Patient
                 </Button>
                 <Button
-                  onClick={handleTestSubmit}
-                  disabled={loading}
-                  className="bg-rose-600 hover:bg-rose-700 text-white px-8"
+                  onClick={() => window.location.href = '/doctor/dashboard'}
+                  className="w-full lg:w-auto bg-gray-600 hover:bg-gray-700 text-white px-6 lg:px-8"
                 >
-                  {loading ? "Processing..." : "Register & Generate Recommendations"}
+                  Go to Dashboard
                 </Button>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </div>
+      </div>
 
-        {/* Step 3: Recommendations */}
-        {currentStep === "recommendations" && classificationResult && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="space-y-6"
-          >
-            {/* Patient Summary */}
-            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-blue-800 mb-4">New Patient Registered</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Name:</p>
-                  <p className="font-medium text-gray-900">{form.name}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Age:</p>
-                  <p className="font-medium text-gray-900">{form.age} years</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Patient ID:</p>
-                  <p className="font-medium text-gray-900 text-xs">{classificationResult.patientId}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Classification Result */}
-            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-blue-800 mb-4">Classification Result</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-gray-600">Group</p>
-                  <p className="text-2xl font-bold text-blue-900">{classificationResult.group}</p>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-gray-600">Bucket</p>
-                  <p className="text-2xl font-bold text-green-900">{classificationResult.bucket}</p>
-                </div>
-                <div className="text-center p-4 bg-rose-50 rounded-lg">
-                  <p className="text-gray-600">Situation</p>
-                  <p className="text-2xl font-bold text-rose-900">{classificationResult.situation}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Recommendations Table */}
-            <RecommendationTable
-              situationId={classificationResult.situationId}
-              labReportId={classificationResult.labReportId}
-              onRecommendationsSaved={handleRecommendationsSaved}
-            />
-
-            {/* Medication Recommendation */}
-            <MedicationRecommendation
-              labReportId={classificationResult.labReportId}
-              testValues={testValues}
-              classification={classificationResult}
-              onSaved={handleMedicationsSaved}
-            />
-
-            {/* Trend Analysis for New Patient */}
-            <div className="bg-white/80 rounded-xl shadow p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-blue-800 mb-4">Lab Test Trends</h3>
-              <p className="text-gray-600 mb-4">
-                This is the first visit for this patient. Trends will be available after future visits.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-8 text-center">
-                <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-500">Trend analysis will be available after multiple visits</p>
-              </div>
-            </div>
-
-            <div className="flex justify-center">
-              <Button
-                onClick={handleCompleteRegistration}
-                className="bg-green-600 hover:bg-green-700 text-white px-8"
-              >
-                Complete Patient Registration
-              </Button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Step 4: Complete */}
-        {currentStep === "complete" && classificationResult && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-center space-y-6"
-          >
-            <div className="bg-green-50 border border-green-200 rounded-xl p-8">
-              <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-green-800 mb-2">
-                Patient Successfully Registered!
-              </h2>
-              <p className="text-green-700">
-                {form.name} has been registered and initial recommendations have been generated.
-              </p>
-            </div>
-
-            {/* Patient Report */}
-            <PatientReport
-              patient={{
-                name: form.name,
-                age: parseInt(form.age),
-                gender: form.gender,
-                nationalid: form.nationalId,
-                contactinfo: form.contactInfo || ""
-              }}
-              testValues={testValues}
-              classification={classificationResult}
-              recommendations={savedRecommendations}
-              medications={savedMedications}
-              visitType="initial"
-              doctorName={user?.name || "Dr. [Doctor Name]"}
-              visitDate={new Date().toLocaleDateString()}
-              notes=""
-            />
-
-            {/* Action buttons */}
-            <div className="flex justify-center space-x-4">
-              <Button
-                onClick={handleStartNewRegistration}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-              >
-                Register Another Patient
-              </Button>
-              <Button
-                onClick={() => window.location.href = '/doctor/dashboard'}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-8"
-              >
-                Go to Dashboard
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </main>
-
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialog - FIXED: Mobile responsive */}
       {showConfirmDialog && (
-        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-2xl border-2 border-gray-300">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 lg:p-6 max-w-md w-full mx-4 shadow-2xl border-2 border-gray-300">
             <div className="flex items-center mb-4">
-              <AlertTriangle className="w-6 h-6 text-amber-500 mr-2" />
-              <h3 className="text-lg font-semibold text-gray-900">Confirm Complete Registration</h3>
+              <AlertTriangle className="w-5 h-5 lg:w-6 lg:h-6 text-amber-500 mr-2" />
+              <h3 className="text-base lg:text-lg font-semibold text-gray-900">Confirm Complete Registration</h3>
             </div>
             
             <div className="mb-4">
-              <p className="text-gray-700 mb-3">
+              <p className="text-gray-700 text-sm lg:text-base mb-3">
                 You are about to complete the patient registration, but it appears you haven't saved:
               </p>
               
               <ul className="text-sm text-gray-600 mb-4 space-y-1">
                 {savedRecommendations.length === 0 && (
                   <li className="flex items-center">
-                    <span className="w-2 h-2 bg-amber-400 rounded-full mr-2"></span>
-                    Treatment recommendations
+                    <span className="w-2 h-2 bg-amber-400 rounded-full mr-2 flex-shrink-0"></span>
+                    <span>Treatment recommendations</span>
                   </li>
                 )}
                 {!medicationsSaved && (
                   <li className="flex items-center">
-                    <span className="w-2 h-2 bg-amber-400 rounded-full mr-2"></span>
-                    Medication prescriptions
+                    <span className="w-2 h-2 bg-amber-400 rounded-full mr-2 flex-shrink-0"></span>
+                    <span>Medication prescriptions</span>
                   </li>
                 )}
               </ul>
@@ -529,7 +631,7 @@ export default function RegisterPatient({ user }: { user: any }) {
               </p>
             </div>
             
-            <div className="flex space-x-3">
+            <div className="flex flex-col lg:flex-row gap-3">
               <Button
                 onClick={() => setShowConfirmDialog(false)}
                 className="flex-1 bg-gray-500 hover:bg-gray-600 text-white"
