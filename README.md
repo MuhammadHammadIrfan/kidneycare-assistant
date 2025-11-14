@@ -7,6 +7,7 @@ KidneyCare Assistant is a clinician-focused decision support platform designed i
 This system improves workflow efficiency, ensures up-to-date patient monitoring, and centralizes all visit and lab report information in one interface.
 
 🚀 Features
+
 ✔ Patient Management
 
 Register new patients with complete demographic details.
@@ -89,8 +90,11 @@ Lucide Icons – UI icons
 Create a .env.local file:
 
 NEXT_PUBLIC_SUPABASE_URL=your_url
+
 NEXT_PUBLIC_SUPABASE_KEY=anon_key
+
 SUPABASE_SERVICE_ROLE_KEY=service_role_key
+
 JWT_SECRET=your_secret
 
 📌 Future Enhancements
