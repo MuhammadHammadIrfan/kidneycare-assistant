@@ -1,40 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+KidneyCare Assistant
 
-## Getting Started
+(Clinical Decision Support System for Nephrologists)
 
-First, run the development server:
+KidneyCare Assistant is a clinician-focused decision support platform designed in collaboration with a hospital nephrology department. It helps doctors manage patient visits, track lab results, analyze trends, and generate treatment recommendations based on predefined clinical rules.
 
-```bash
+This system improves workflow efficiency, ensures up-to-date patient monitoring, and centralizes all visit and lab report information in one interface.
+
+🚀 Features
+✔ Patient Management
+
+Register new patients with complete demographic details.
+
+Search and filter existing patients.
+
+View full patient history including all previous visits and lab reports.
+
+✔ Lab Reports & Test Results
+
+Add new lab test results with file upload support.
+
+Automatic test validity calculation based on test type (e.g., PTH = 3 months, Echo = 12 months).
+
+Trend graphs for Calcium, Phosphate, PTH, Albumin, eGFR, and other lab markers.
+
+Edit or delete test results or full reports with audit tracking.
+
+✔ Clinical Recommendations
+
+Recommendations generated from hospital-defined business logic.
+
+Logic checks test ranges, interactions, and clinical rules.
+
+Medication suggestions based on historical prescriptions of similar patients.
+
+Doctor can review, edit, or override recommendations before saving.
+
+✔ Visit Management
+
+Follow-up visit form automatically fetches latest valid test results.
+
+System warns if a test is outdated and needs rechecking.
+
+Saves all visits chronologically.
+
+✔ Security & Access Control
+
+Role-based access: Admin & Doctor.
+
+Encrypted authentication tokens.
+
+Secure audit logs for edits, deletions, and updates.
+
+✔ UI / UX
+
+Clean dashboard with animated stats.
+
+Sidebar with expand/collapse toggle and responsive mobile behavior.
+
+Light, fast, and optimized user interface.
+
+📁 Report Generator
+
+Generates PDF visit Reports for patients.
+
+🧱 Tech Stack
+
+Next.js (Pages Router) – Frontend + Backend APIs
+
+Supabase – Database, Auth, Admin SDK
+
+PostgreSQL – Relational Database
+
+Tailwind CSS – UI styling
+
+Framer Motion – UI animations
+
+Lucide Icons – UI icons
+
+📦 Project Structure
+/components       → Shared UI Components  
+/pages/api        → Backend API routes  
+/pages/doctor     → Doctor dashboard, registration, follow-up  
+/pages/admin      → Admin dashboard  
+/supabase         → Database config & service role  
+
+🔐 Environment Variables
+
+Create a .env.local file:
+
+NEXT_PUBLIC_SUPABASE_URL=your_url
+NEXT_PUBLIC_SUPABASE_KEY=anon_key
+SUPABASE_SERVICE_ROLE_KEY=service_role_key
+JWT_SECRET=your_secret
+
+📌 Future Enhancements
+
+These are planned features not yet implemented:
+
+🔮 AI-Powered Enhancements
+
+LLM-based Recommendation Assistant
+Draft personalized explanations for clinical recommendations.
+
+RAG (Retrieval-Augmented Generation)
+Use hospital protocols + patient data for contextual recommendations.
+
+AI-assisted Query Chatbot
+Let doctors ask: “Show calcium trend for last 6 months” or
+“Suggest dose adjustment for hyperphosphatemia.”
+
+📊 Advanced Analytics
+
+Automated risk categorization (CKD Stage, MBD risk, anemia flagging).
+
+Predictive modeling for test deterioration.
+
+
+🛠 Running Locally
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+Open:
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+http://localhost:3000
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+🧪 Building for Production
+npm run build
+npm start
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+📜 License
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+This project is private and hospital-specific.
+Not open for public contributions.
