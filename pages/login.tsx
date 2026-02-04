@@ -3,8 +3,8 @@ import { useRouter } from "next/router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { motion } from "framer-motion";
-import { Eye, EyeOff } from "lucide-react"; // Add this import
-import Cookies from "js-cookie";
+import { Eye, EyeOff } from "lucide-react";
+import { setCurrentUser } from "../lib/auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [role, setRole] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // Add this state
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -24,6 +24,7 @@ export default function LoginPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, role }),
+      credentials: 'include', // Important: include cookies in request
     });
 
     const data = await res.json();
@@ -32,7 +33,14 @@ export default function LoginPage() {
     if (!res.ok) {
       setError(data.error || "Login failed");
     } else {
-      Cookies.set("kc_user", JSON.stringify(data), { expires: 1 }); // 1 day expiry
+      // Save user info for UI display (auth is handled by HTTP-only cookie)
+      setCurrentUser({
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+      });
+      
       // Redirect based on user role
       if (data.role === "admin") {
         router.push("/admin/dashboard");

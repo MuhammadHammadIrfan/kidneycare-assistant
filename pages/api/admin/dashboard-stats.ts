@@ -1,21 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../lib/supabaseAdmin";
-import nookies from "nookies";
+import { requireAdmin } from "../../../lib/authToken";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Get adminId from cookie
-  const cookies = nookies.get({ req });
-  const user = cookies.kc_user ? JSON.parse(cookies.kc_user) : null;
-  const adminId = user?.id;
-  const userRole = user?.role;
-
-  if (!adminId || userRole !== "admin") {
-    return res.status(401).json({ error: "Unauthorized: Admin access required" });
-  }
+  // Get authenticated admin from secure JWT token
+  const user = requireAdmin(req, res);
+  if (!user) return; // Response already sent by requireAdmin
 
   try {
     // 1. TOTAL DOCTORS (Users with role='doctor')

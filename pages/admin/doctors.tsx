@@ -236,13 +236,15 @@ export default function DoctorsManagement({ user }: { user: any }) {
       <main className={`flex-1 min-h-screen bg-gradient-to-br from-blue-100 via-white to-rose-100 p-4 lg:p-10 transition-all duration-300 ${
         isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
       }`}>
-        {/* FIXED: Update Mobile Menu Button */}
-        <button
-          className="lg:hidden mb-4 p-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow-md"
-          onClick={toggleSidebar}
-        >
-          <Menu className="w-6 h-6" />
-        </button>
+        {/* Menu Button - always visible */}
+        <div className="mb-4">
+          <button
+            className="p-3 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-colors shadow-lg"
+            onClick={toggleSidebar}
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+        </div>
 
         <div className="mx-2 lg:mx-0">
           {/* Page Title */}

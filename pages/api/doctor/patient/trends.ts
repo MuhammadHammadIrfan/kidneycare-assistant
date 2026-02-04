@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
-import nookies from 'nookies';
+import { requireDoctor } from '../../../../lib/authToken';
 
 export default async function handler(
   req: NextApiRequest,
@@ -12,14 +12,12 @@ export default async function handler(
     return res.status(405).end();
   }
 
-  const cookies = nookies.get({ req });
-  const user = cookies.kc_user ? JSON.parse(cookies.kc_user) : null;
-  const doctorId = user?.id;
+  // Get authenticated doctor from secure JWT token
+  const user = requireDoctor(req, res);
+  if (!user) return; // Response already sent by requireDoctor
+  
+  const doctorId = user.id;
   const { patientId } = req.query;
-
-  if (!doctorId) {
-    return res.status(401).json({ error: 'Unauthorized: doctorId missing' });
-  }
 
   if (!patientId) {
     return res.status(400).json({ error: 'Patient ID is required' });

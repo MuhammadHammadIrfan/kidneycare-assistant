@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
-import nookies from "nookies";
+import { requireDoctor } from "../../../../lib/authToken";
 import { classifyPatientSituation, TestValues } from "../../../../lib/classify";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -8,14 +8,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Get doctorId from cookie
-  const cookies = nookies.get({ req });
-  const user = cookies.kc_user ? JSON.parse(cookies.kc_user) : null;
-  const doctorId = user?.id;
-
-  if (!doctorId) {
-    return res.status(401).json({ error: "Unauthorized: doctorId missing" });
-  }
+  // Get authenticated doctor from secure JWT token
+  const user = requireDoctor(req, res);
+  if (!user) return; // Response already sent by requireDoctor
+  
+  const doctorId = user.id;
 
   const { labReportId, testResults } = req.body;
 

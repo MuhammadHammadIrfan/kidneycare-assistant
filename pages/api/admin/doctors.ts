@@ -1,17 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../lib/supabaseAdmin";
-import nookies from "nookies";
+import { requireAdmin } from "../../../lib/authToken";
 import bcrypt from "bcryptjs";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const cookies = nookies.get({ req });
-  const user = cookies.kc_user ? JSON.parse(cookies.kc_user) : null;
-  const adminId = user?.id;
-  const userRole = user?.role;
-
-  if (!adminId || userRole !== "admin") {
-    return res.status(401).json({ error: "Unauthorized: Admin access required" });
-  }
+  // Get authenticated admin from secure JWT token
+  const user = requireAdmin(req, res);
+  if (!user) return; // Response already sent by requireAdmin
+  
+  const adminId = user.id; // Used for tracking who made changes
 
   if (req.method === "GET") {
     // GET ALL DOCTORS WITH SEARCH - Updated column names

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import { UserPlus, LayoutDashboard, History, BarChart2, LogOut, UserSearch, X } from "lucide-react";
-import Cookies from "js-cookie";
+import { signOut } from "../../lib/auth";
 import { useEffect } from "react";
 
 const navLinks = [
@@ -22,10 +22,8 @@ export default function DoctorSidebar({
 }) {
   const router = useRouter();
 
-  const handleSignOut = () => {
-    Cookies.remove("kc_user");
-    localStorage.removeItem("kc_user");
-    sessionStorage.clear();
+  const handleSignOut = async () => {
+    await signOut();
     router.push("/");
   };
 
