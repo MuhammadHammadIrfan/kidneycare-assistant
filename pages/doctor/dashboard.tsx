@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Menu, Users, FileText, Activity, AlertTriangle, TrendingUp, Calendar, Pill } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Menu, Users, FileText, Activity, AlertTriangle, TrendingUp, Calendar, Pill, Lock, Eye, EyeOff, X } from "lucide-react";
 import DoctorSidebar from "../../components/doctor/DoctorSidebar";
 import { requireAuthServer } from "../../lib/requireAuthServer";
 
@@ -48,6 +48,20 @@ export default function DoctorDashboard({ user }: { user: any }) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activity, setActivity] = useState<RecentActivity | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Password update modal states
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordUpdateLoading, setPasswordUpdateLoading] = useState(false);
+  const [passwordUpdateError, setPasswordUpdateError] = useState<string | null>(null);
+  const [passwordUpdateSuccess, setPasswordUpdateSuccess] = useState<string | null>(null);
 
   // Initialize sidebar state based on screen size
   useEffect(() => {
@@ -113,6 +127,68 @@ export default function DoctorDashboard({ user }: { user: any }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Password update functions
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordUpdateLoading(true);
+    setPasswordUpdateError(null);
+    setPasswordUpdateSuccess(null);
+
+    // Validation
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordUpdateError("New passwords don't match");
+      setPasswordUpdateLoading(false);
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordUpdateError("New password must be at least 6 characters long");
+      setPasswordUpdateLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/doctor/update-password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setPasswordUpdateError(data.error || 'Failed to update password');
+      } else {
+        setPasswordUpdateSuccess('Password updated successfully!');
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        // Close modal after 2 seconds
+        setTimeout(() => {
+          setShowPasswordModal(false);
+          setPasswordUpdateSuccess(null);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Password update error:', error);
+      setPasswordUpdateError('An error occurred. Please try again.');
+    } finally {
+      setPasswordUpdateLoading(false);
+    }
+  };
+
+  const resetPasswordModal = () => {
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setPasswordUpdateError(null);
+    setPasswordUpdateSuccess(null);
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
   };
 
   const mainStats = stats ? [
@@ -195,20 +271,50 @@ export default function DoctorDashboard({ user }: { user: any }) {
           </button>
         </div>
 
-        {/* Welcome Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-6 sm:mb-8"
-        >
-          <h1 className="text-2xl sm:text-3xl font-bold text-blue-900 mb-2">
-            Welcome, Dr. {user?.name || "Doctor"}
-          </h1>
-          <p className="text-blue-700 text-sm sm:text-base opacity-80">
-            Here's your medical practice overview
-          </p>
-        </motion.div>
+        {/* Welcome Header with Actions */}
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-3 lg:gap-4 mb-6 sm:mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h1 className="text-2xl sm:text-3xl font-bold text-blue-900 mb-2">
+              Welcome, Dr. {user?.name || "Doctor"}
+            </h1>
+            <p className="text-blue-700 text-sm sm:text-base opacity-80">
+              Here's your medical practice overview
+            </p>
+          </motion.div>
+
+          {/* Doctor Actions */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+            className="flex flex-col sm:flex-row gap-2 lg:gap-3"
+          >
+            <button
+              onClick={() => {
+                resetPasswordModal();
+                setShowPasswordModal(true);
+              }}
+              className="flex items-center justify-center gap-2 px-3 lg:px-4 py-2 lg:py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl text-sm lg:text-base"
+            >
+              <Lock className="w-4 h-4 lg:w-5 lg:h-5" />
+              <span className="hidden sm:inline">Change Password</span>
+              <span className="sm:hidden">Password</span>
+            </button>
+            
+            <button
+              onClick={() => fetchDashboardData()}
+              className="flex items-center justify-center gap-2 px-3 lg:px-4 py-2 lg:py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl text-sm lg:text-base"
+            >
+              <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5" />
+              <span className="hidden sm:inline">Refresh Data</span>
+              <span className="sm:hidden">Refresh</span>
+            </button>
+          </motion.div>
+        </div>
 
         {/* Main Statistics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
@@ -397,6 +503,165 @@ export default function DoctorDashboard({ user }: { user: any }) {
           </motion.div>
         )}
       </main>
+
+      {/* Password Update Modal */}
+      <AnimatePresence>
+        {showPasswordModal && (
+          <div className="fixed inset-0 bg-blue-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="bg-gradient-to-br from-white/95 via-blue-50/90 to-amber-50/90 backdrop-blur-sm rounded-xl shadow-2xl border border-blue-200 p-4 lg:p-8 w-full max-w-md mx-4 relative"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-5 h-5 lg:w-6 lg:h-6" />
+              </button>
+
+              {/* Modal Header */}
+              <div className="mb-4 lg:mb-6">
+                <div className="flex items-center mb-2">
+                  <Lock className="w-6 h-6 lg:w-8 lg:h-8 text-amber-600 mr-3" />
+                  <h3 className="text-lg lg:text-2xl font-bold text-blue-900">
+                    Change Password
+                  </h3>
+                </div>
+                <p className="text-gray-700 font-medium text-sm lg:text-base">
+                  Update your account password
+                </p>
+              </div>
+              
+              {/* Password Form */}
+              <form onSubmit={handlePasswordUpdate} className="space-y-4 lg:space-y-5">
+                {/* Current Password */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Current Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                      required
+                      className="w-full px-3 lg:px-4 py-2 lg:py-3 pr-10 lg:pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-500 bg-white/95 backdrop-blur-sm shadow-sm text-sm lg:text-base"
+                      placeholder="Enter current password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4 lg:w-5 lg:h-5" /> : <Eye className="w-4 h-4 lg:w-5 lg:h-5" />}
+                    </button>
+                  </div>
+                </div>
+                
+                {/* New Password */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                      required
+                      className="w-full px-3 lg:px-4 py-2 lg:py-3 pr-10 lg:pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-500 bg-white/95 backdrop-blur-sm shadow-sm text-sm lg:text-base"
+                      placeholder="Enter new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4 lg:w-5 lg:h-5" /> : <Eye className="w-4 h-4 lg:w-5 lg:h-5" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">At least 6 characters</p>
+                </div>
+
+                {/* Confirm New Password */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                      required
+                      className="w-full px-3 lg:px-4 py-2 lg:py-3 pr-10 lg:pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900 font-medium placeholder-gray-500 bg-white/95 backdrop-blur-sm shadow-sm text-sm lg:text-base"
+                      placeholder="Confirm new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4 lg:w-5 lg:h-5" /> : <Eye className="w-4 h-4 lg:w-5 lg:h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Error Message */}
+                {passwordUpdateError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-red-600 text-sm text-center bg-red-50/90 backdrop-blur-sm border border-red-200 rounded-md p-3"
+                  >
+                    {passwordUpdateError}
+                  </motion.div>
+                )}
+
+                {/* Success Message */}
+                {passwordUpdateSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-green-600 text-sm text-center bg-green-50/90 backdrop-blur-sm border border-green-200 rounded-md p-3"
+                  >
+                    {passwordUpdateSuccess}
+                  </motion.div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordModal(false)}
+                    className="w-full sm:w-auto px-4 lg:px-6 py-2 lg:py-3 text-gray-700 bg-white/95 backdrop-blur-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-semibold shadow-sm text-sm lg:text-base"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={passwordUpdateLoading}
+                    className="w-full sm:w-auto px-4 lg:px-6 py-2 lg:py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-lg transition-all duration-200 font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm lg:text-base"
+                  >
+                    {passwordUpdateLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="w-3 h-3 lg:w-4 lg:h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                        <span>Updating...</span>
+                      </div>
+                    ) : (
+                      'Update Password'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
