@@ -394,15 +394,10 @@ export default function DoctorsManagement({ user }: { user: any }) {
                           </div>
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             doctor.active
-                              ? doctor.stats.isActive 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-yellow-100 text-yellow-800'
+                              ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
                           }`}>
-                            {doctor.active 
-                              ? (doctor.stats.isActive ? 'Active' : 'Inactive') 
-                              : 'Deactivated'
-                            }
+                            {doctor.active ? 'Active' : 'Deactivated'}
                           </span>
                         </div>
 
@@ -494,15 +489,10 @@ export default function DoctorsManagement({ user }: { user: any }) {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               doctor.active
-                                ? doctor.stats.isActive 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-yellow-100 text-yellow-800'
+                                ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                             }`}>
-                              {doctor.active 
-                                ? (doctor.stats.isActive ? 'Active' : 'Inactive') 
-                                : 'Deactivated'
-                            }
+                              {doctor.active ? 'Active' : 'Deactivated'}
                             </span>
                             {!doctor.active && doctor.deactivatedat && (
                               <div className="text-xs text-gray-500 mt-1">
