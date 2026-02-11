@@ -4,13 +4,13 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Optional: Verify it's a cron request (Vercel adds this header)
+  // Verify the request is from cron-job.org using the secret
   const authHeader = req.headers.authorization;
+  const expectedAuth = `Bearer ${process.env.CRON_SECRET}`;
   
-  // In production, you can add a secret to verify the request
-  // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-  //   return res.status(401).json({ error: "Unauthorized" });
-  // }
+  if (process.env.CRON_SECRET && authHeader !== expectedAuth) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
   try {
     // Simple query to keep the database active
